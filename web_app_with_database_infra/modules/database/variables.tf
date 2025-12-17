@@ -22,4 +22,7 @@ variable "administrator_login" {
     description = "The administrator login for the database"
     type        = string            
 }
-
+variable " subnet_id " {
+    description = "The ID of the subnet where the database will be deployed"
+    type        = string 
+}

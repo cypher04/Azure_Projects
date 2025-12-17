@@ -9,7 +9,7 @@ resource "azurerm_subnet" "main" {
     name                 = "subnet-${var.environment}"
     resource_group_name  = var.resource_group_name
     virtual_network_name = azurerm_virtual_network.main.name
-    address_prefixes     = var.subnet_prefixes
+    address_prefixes     = var.subnet_prefixes["management"]
 }
 
 resource "azurerm_subnet" "database" {
@@ -24,5 +24,12 @@ resource "azurerm_subnet" "app" {
     resource_group_name  = var.resource_group_name
     virtual_network_name = azurerm_virtual_network.main.name
     address_prefixes     = var.subnet_prefixes["web"]
+}
+
+resource "azurerm_public_ip" "pip" {
+    name                = "pip-${var.environment}"
+    location            = var.location
+    resource_group_name = var.resource_group_name
+    allocation_method   = "Dynamic"
 }
 

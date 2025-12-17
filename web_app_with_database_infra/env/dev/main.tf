@@ -26,14 +26,6 @@ module "networking" {
         subnet_prefixes = var.subnet_prefixes
 }
 
-module "database" {
-    source = "../../modules/database"
-    
-        resource_group_name = azurerm_resource_group.main.name
-        location            = azurerm_resource_group.main.location
-        environment         = var.environment
-        administrator_login = var.administrator_login
-        administrator_password = var.administrator_password
-}
+
 
 
