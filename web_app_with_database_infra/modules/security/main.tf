@@ -113,8 +113,8 @@ resource "azurerm_application_gateway" "appg" {
     location            = var.location
     resource_group_name = var.resource_group_name
     sku {
-        name     = "Standard_v2"
-        tier     = "Standard_v2"
+        name = "WAF_v2"
+        tier = "WAF_v2"
         capacity = 2
     }
     gateway_ip_configuration {
@@ -152,6 +152,8 @@ resource "azurerm_application_gateway" "appg" {
         backend_address_pool_name  = local.backend_address_pool_name
         backend_http_settings_name = local.backend_http_settings_name
     }
+
+    firewall_policy_id = azurerm_web_application_firewall_policy.waf_policy.id
 }
 
 resource "azurerm_web_application_firewall_policy" "waf_policy" {
@@ -184,10 +186,8 @@ resource "azurerm_web_application_firewall_policy" "waf_policy" {
   
 }
 
-resource "azurerm_application_gateway_waf_policy_association" "appg_waf_association" {
-    application_gateway_id      = azurerm_application_gateway.appg.id
-    web_application_firewall_policy_id = azurerm_web_application_firewall_policy.waf_policy.id
-}
+
+
 
 
 
