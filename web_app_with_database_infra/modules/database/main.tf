@@ -2,16 +2,16 @@
 
 
 
-resource "azurerm_mssql_database_server" "mssql_server" {
-    name                         = "sqlserver-${var.environment}-${random_string.suffix.result}"
+resource "azurerm_mssql_server" "mssql_server" {
+    name                         = "mssql-server-${var.environment}"
     resource_group_name          = var.resource_group_name
     location                     = var.location
-    administrator_login          = var.administrator_login
-    administrator_login_password = var.administrator_password
     version                      = "12.0"
-    tls_version                   = "1.2"
-    https_enforcement_enabled     = true
+    administrator_login          = var.administrator_login
+    administrator_login_password = var.administrator_password  
 
+
+    
     tags = {
         environment = var.environment
     }
@@ -20,12 +20,12 @@ resource "azurerm_mssql_database_server" "mssql_server" {
 
 resource "azurerm_mssql_database" "msdb" {
     name                = "maindb"
-    server_id           = azurerm_mssql_database_server.mssql_server.id
+    server_id           = azurerm_mssql_server.mssql_server.id
     sku_name           = "S0"
     collation          = "SQL_Latin1_General_CP1_CI_AS"
     max_size_gb       = 2
     license_type      = "BasePrice"
-    enclave_type = "vbs"
+    enclave_type = "VBS"
 
     tags = {
         environment = var.environment
@@ -34,8 +34,9 @@ resource "azurerm_mssql_database" "msdb" {
 
 resource "azurerm_mssql_virtual_network_rule" "sql_vnet_rule" {
     name      = "sql-vnet-rule-${var.environment}"
-    server_id = azurerm_mssql_database_server.mssql_server.id
-    subnet_id = var.subnet_prefixes["database"].id
+    server_id = azurerm_mssql_server.mssql_server.id
+    subnet_id = var.subnet_id
 }
+
 
 

@@ -30,7 +30,7 @@ resource "azurerm_network_security_group" "nsg" {
     }    
 }
 
-resource "azurerm_security_group" "fordb" {
+resource "azurerm_network_security_group" "fordb" {
     name                = "sg-db-${var.environment}"
     location            = var.location
     resource_group_name = var.resource_group_name
@@ -41,7 +41,7 @@ resource "azurerm_security_group" "fordb" {
         direction                  = "Inbound"
         access                     = "Allow"
         protocol                   = "Tcp"
-        source_port_range          = "*"
+        source_port_range          = "3000"
         destination_port_range     = "1433"
         source_address_prefix      = var.subnet_prefixes["app"]
         destination_address_prefix = "*"
@@ -88,13 +88,13 @@ resource "azurerm_security_group" "fordb" {
 
 
 resource "azurerm_subnet_network_security_group_association" "app_subnet_nsg_association" {
-    subnet_id                 = var.subnet_prefixes["app"].id
+    subnet_id                 = var.subnet_ids[0]
     network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
 resource "azurerm_subnet_network_security_group_association" "db_subnet_nsg_association" {
-    subnet_id                 = var.subnet_prefixes["db"].id
-    network_security_group_id = azurerm_security_group.fordb.id
+    subnet_id                 = var.subnet_ids[1]
+    network_security_group_id = azurerm_network_security_group.fordb.id
 }
 
 
@@ -119,7 +119,7 @@ resource "azurerm_application_gateway" "appg" {
     }
     gateway_ip_configuration {
         name      = local.gateway_ip_configuration_name
-        subnet_id = var.subnet_prefixes["management"].id
+        subnet_id = var.subnet_ids[0]
     }
     frontend_port {
         name = local.frontend_port_name
@@ -127,7 +127,7 @@ resource "azurerm_application_gateway" "appg" {
     }
     frontend_ip_configuration {
         name                 = local.frontend_ip_configuration_name
-        public_ip_address_id = azurerm_public_ip.pip.id
+        public_ip_address_id = var.pip_id
     }
     backend_address_pool {
         name = local.backend_address_pool_name
@@ -153,4 +153,6 @@ resource "azurerm_application_gateway" "appg" {
         backend_http_settings_name = local.backend_http_settings_name
     }
 }
+
+
 

@@ -22,7 +22,28 @@ variable "administrator_login" {
     description = "The administrator login for the database"
     type        = string            
 }
-variable " subnet_id " {
+variable "subnet_id" {
     description = "The ID of the subnet where the database will be deployed"
     type        = string 
 }
+
+variable "subnet_prefixes" {
+    description = "The address prefixes for the subnet"
+    type        = list(string)
+}
+
+variable "mssql_server_name" {
+    description = "The name of the MSSQL Server"
+    type        = string
+}
+
+variable "mssql_db_name" {
+    description = "The name of the MSSQL Database"
+    type        = string
+}
+
+# variable "mssql_server_id" {
+#     description = "The ID of the MSSQL Server"
+#     type        = string
+# }
+
