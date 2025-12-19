@@ -123,7 +123,7 @@ resource "azurerm_application_gateway" "appg" {
     }
     frontend_port {
         name = local.frontend_port_name
-        port = 80
+        port = 443
     }
     frontend_ip_configuration {
         name                 = local.frontend_ip_configuration_name
@@ -135,15 +135,15 @@ resource "azurerm_application_gateway" "appg" {
     backend_http_settings {
         name                  = local.backend_http_settings_name
         cookie_based_affinity = "Disabled"
-        port                  = 80
-        protocol              = "Http"
+        port                  = 443
+        protocol              = "Https"
         request_timeout       = 20
     }
     http_listener {
         name                           = local.http_listener_name
         frontend_ip_configuration_name = local.frontend_ip_configuration_name
         frontend_port_name             = local.frontend_port_name
-        protocol                       = "Http"
+        protocol                       = "Https"
     }
     request_routing_rule {
         name                       = local.request_routing_rule_name
