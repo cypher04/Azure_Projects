@@ -18,10 +18,10 @@ variable "address_space" {
     type        = list(string)
 }
 
-variable "subnet_prefixes" {
-    description = "The address prefixes for the subnet"
-    type        = map(string)
-}
+# variable "subnet_prefixes" {
+#     description = "The address prefixes for the subnet"
+#     type        = map(string)
+# }
 
 variable "subnet_ids" {
     description = "The IDs of the subnets"
