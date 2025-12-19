@@ -33,7 +33,7 @@ module "networking" {
   location            = azurerm_resource_group.main.location
   environment         = var.environment
   address_space       = var.address_space
-  # subnet_prefixes     = var.subnet_prefixes
+  subnet_prefixes     = var.subnet_prefixes
   subnet_ids           = module.networking.subnet_ids
 
 }
