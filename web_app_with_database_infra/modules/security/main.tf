@@ -154,5 +154,42 @@ resource "azurerm_application_gateway" "appg" {
     }
 }
 
+resource "azurerm_web_application_firewall_policy" "waf_policy" {
+    name                = "waf-policy-${var.environment}"
+    location            = var.location
+    resource_group_name = var.resource_group_name
+
+    custom_rules {
+        name      = "BlockSQLInjection"
+        priority  = 1
+        rule_type = "MatchRule"
+
+        match_conditions {
+            match_variables {
+                variable_name = "QueryString"
+            }
+            operator       = "Contains"
+            match_values   = ["SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "UNION"]
+        }
+
+        action = "Block"
+    }
+
+    managed_rules {
+        managed_rule_set {
+            type    = "OWASP"
+            version = "3.2"
+        }
+    }
+  
+}
+
+resource "azurerm_application_gateway_waf_policy_association" "appg_waf_association" {
+    application_gateway_id      = azurerm_application_gateway.appg.id
+    web_application_firewall_policy_id = azurerm_web_application_firewall_policy.waf_policy.id
+}
+
+
+
 
 
