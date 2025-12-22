@@ -41,6 +41,7 @@ resource "azurerm_service_plan" "serveplan" {
       app_service_id   = azurerm_linux_web_app.webapp.id
       auth_settings {
         enabled = true
+        unauthenticated_client_action = "RedirectToLoginPage"
       }
 
       site_config {
@@ -53,6 +54,7 @@ resource "azurerm_service_plan" "serveplan" {
       app_service_id   = azurerm_linux_web_app.webapp.id
       auth_settings {
         enabled = true
+        unauthenticated_client_action = "RedirectToLoginPage"
       }
       
       site_config {
