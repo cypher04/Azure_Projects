@@ -15,6 +15,10 @@ resource "azurerm_service_plan" "serveplan" {
       resource_group_name = var.resource_group
       service_plan_id     = azurerm_service_plan.serveplan.id
       client_certificate_enabled = true
+      auth_settings {
+        enabled = true
+      }
+
       site_config {}
 
         app_settings = {
