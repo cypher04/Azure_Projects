@@ -112,6 +112,9 @@ resource "azurerm_application_gateway" "appg" {
     name                = "appg-${var.environment}"
     location            = var.location
     resource_group_name = var.resource_group_name
+    identity {
+        type = "SystemAssigned"
+    }
     sku {
         name = "WAF_v2"
         tier = "WAF_v2"

@@ -10,6 +10,10 @@ resource "azurerm_mssql_server" "mssql_server" {
     administrator_login          = var.administrator_login
     administrator_login_password = var.administrator_password  
 
+    identity {
+        type = "SystemAssigned"
+    }
+
 
     
     tags = {
