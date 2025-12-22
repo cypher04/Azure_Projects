@@ -14,6 +14,7 @@ resource "azurerm_service_plan" "serveplan" {
       location            = var.location
       resource_group_name = var.resource_group
       service_plan_id     = azurerm_service_plan.serveplan.id
+      client_certificate_enabled = true
       site_config {}
 
         app_settings = {
@@ -36,7 +37,7 @@ resource "azurerm_service_plan" "serveplan" {
     resource "azurerm_linux_web_app_slot" "green" {
       name                = "${var.project_name}-webapp-staging2-${var.environment}"
       app_service_id   = azurerm_linux_web_app.webapp.id
-      client_certificate_enabled = true
+      
       site_config {
 
       }
