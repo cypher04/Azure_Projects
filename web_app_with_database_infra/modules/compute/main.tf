@@ -25,6 +25,7 @@ resource "azurerm_linux_web_app" "liweb" {
     resource_group_name = var.resource_group_name
     service_plan_id     = azurerm_app_service_plan.main.id
     client_certificate_enabled = true
+    client_certificate_mode = "Required"
     identity {
         type = "SystemAssigned"
     }
