@@ -24,6 +24,7 @@ resource "azurerm_linux_web_app" "liweb" {
     location            = var.location
     resource_group_name = var.resource_group_name
     service_plan_id     = azurerm_app_service_plan.main.id
+    client_certificate_enabled = true
     
     site_config {
         
