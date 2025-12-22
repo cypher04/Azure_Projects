@@ -70,7 +70,7 @@ resource "azurerm_traffic_manager_profile" "traman" {
 resource "azurerm_traffic_manager_azure_endpoint" "tramanend" {
     name                = "${var.project_name}-traman-endpoint-${var.environment}"
     profile_id = azurerm_traffic_manager_profile.traman.id
-    target_resource_id = azurerm_public_ip.public_ip_id
+    target_resource_id = var.public_ip_id
     always_serve_enabled = true
     weight = 100
 }
