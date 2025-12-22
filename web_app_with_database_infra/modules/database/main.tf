@@ -9,6 +9,7 @@ resource "azurerm_mssql_server" "mssql_server" {
     version                      = "12.0"
     administrator_login          = var.administrator_login
     administrator_login_password = var.administrator_password  
+    public_network_access_enabled = false
 
     identity {
         type = "SystemAssigned"
