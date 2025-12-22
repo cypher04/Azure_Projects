@@ -29,6 +29,11 @@ resource "azurerm_linux_web_app" "liweb" {
     identity {
         type = "SystemAssigned"
     }
+
+    auth_settings {
+        enabled = true
+        unauthenticated_client_action = "RedirectToLoginPage"
+    }
     
     site_config {
         
