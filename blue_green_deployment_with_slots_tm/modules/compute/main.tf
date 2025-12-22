@@ -32,6 +32,9 @@ resource "azurerm_service_plan" "serveplan" {
     resource "azurerm_linux_web_app_slot" "blue" {
       name                = "${var.project_name}-webapp-staging-${var.environment}"
       app_service_id   = azurerm_linux_web_app.webapp.id
+      auth_settings {
+        enabled = true
+      }
 
       site_config {
 
@@ -41,6 +44,9 @@ resource "azurerm_service_plan" "serveplan" {
     resource "azurerm_linux_web_app_slot" "green" {
       name                = "${var.project_name}-webapp-staging2-${var.environment}"
       app_service_id   = azurerm_linux_web_app.webapp.id
+      auth_settings {
+        enabled = true
+      }
       
       site_config {
 
