@@ -2,7 +2,14 @@
 
 ## 📋 Overview
 
-This architecture implements a **Blue-Green deployment strategy** using Azure App Service deployment slots, enabling zero-downtime deployments with instant rollback capabilities. The infrastructure is secured with Web Application Firewall (WAF) and includes a multi-tier architecture with separate subnets for web, application, and database layers.
+This architecture implements a **Blue-Green deployment strategy** using Azure App Service deployment slots with **Azure Traffic Manager** for intelligent traffic routing, enabling zero-downtime deployments with instant rollback capabilities. The infrastructure is secured with Web Application Firewall (WAF) and includes a multi-tier architecture with separate subnets for web, application, and database layers.
+
+### Key Features
+- **Active Slot Management**: Automated active slot designation with `azurerm_web_app_active_slot`
+- **Traffic Manager**: Priority-based routing with health monitoring
+- **Zero-Downtime Deployments**: Seamless slot swapping with instant rollback
+- **WAF Protection**: OWASP 3.2 rules with custom bot protection
+- **Multi-tier Security**: Network isolation with dedicated subnets and NSG rules
 
 ## 🏗️ High-Level Architecture
 
@@ -41,6 +48,16 @@ This architecture implements a **Blue-Green deployment strategy** using Azure Ap
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │  Public IP (Static)                                          │  │
 │  │  • Connected to Application Gateway                          │  │
+│  │  • Connected to Traffic Manager Endpoint                     │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  Traffic Manager Profile                                     │  │
+│  │  • Routing Method: Priority                                  │  │
+│  │  • DNS: {project}-tm-{env}.trafficmanager.net               │  │
+│  │  • Health Monitoring: HTTPS:443 every 30s                   │  │
+│  │  • TTL: 100 seconds                                          │  │
+│  │  • Endpoint: Public IP (Weight: 100, Always Serve)          │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
@@ -125,7 +142,13 @@ This architecture implements a **Blue-Green deployment strategy** using Azure Ap
 ## 🌐 Traffic Flow
 
 ```
-Internet Traffic
+Internet Traffic (DNS Query)
+      ↓
+[Traffic Manager Profile]
+   • DNS: {project}-tm-{env}.trafficmanager.net
+   • Routing: Priority-based
+   • Health Check: HTTPS:443 every 30s
+   • Resolves to: Static Public IP
       ↓
 [Static Public IP]
       ↓
@@ -167,11 +190,17 @@ env/dev/
 
 modules/
    ├── networking/
+   │     ├── Random ID Generator (Server Naming)
    │     ├── Virtual Network (10.0.0.0/16)
    │     ├── Web Subnet (10.0.1.0/24)
    │     ├── App Subnet (10.0.2.0/24)
    │     ├── Database Subnet (10.0.3.0/24)
-   │     └── Public IP (Static)
+   │     ├── Public IP (Static)
+   │     └── Traffic Manager Profile
+   │         ├── Routing Method: Priority
+   │         ├── DNS Config (TTL: 100s)
+   │         ├── Health Monitor (HTTPS:443)
+   │         └── Azure Endpoint (Public IP, Weight: 100)
    │
    ├── database/
    │     ├── MSSQL Server (v12.0)
@@ -188,8 +217,11 @@ modules/
    │     │   • VNet Integration
    │     ├── Blue Slot (staging)
    │     │   • VNet Integration
-   │     └── Green Slot (staging2)
-   │         • VNet Integration
+   │     │   • Designated as Active Slot
+   │     ├── Green Slot (staging2)
+   │     │   • VNet Integration
+   │     └── Active Slot Configuration
+   │         • Points to: Blue Slot (Default)
    │
    └── security/
          ├── Application Gateway (WAF_v2)
@@ -265,6 +297,9 @@ Public Internet
 | Virtual Network | `{project}-vnet-{env}` | `bluegreen-vnet-dev` |
 | Subnet | `{project}-subnet-{tier}-{env}` | `bluegreen-subnet-web-dev` |
 | Public IP | `{project}-pip-{env}` | `bluegreen-pip-dev` |
+| Traffic Manager Profile | `{project}-traman-{env}` | `bluegreen-traman-dev` |
+| Traffic Manager DNS | `{project}-tm-{env}` | `bluegreen-tm-dev.trafficmanager.net` |
+| Traffic Manager Endpoint | `{project}-traman-endpoint-{env}` | `bluegreen-traman-endpoint-dev` |
 | App Service Plan | `{project}-asp-{env}` | `bluegreen-asp-dev` |
 | Web App | `{project}-webapp-{env}` | `bluegreen-webapp-dev` |
 | Blue Slot | `{project}-webapp-staging-{env}` | `bluegreen-webapp-staging-dev` |
@@ -280,11 +315,19 @@ Public Internet
 
 ```
 Step 1: Networking Module
+   ├── Generate Random ID (for unique server names)
    ├── Create Virtual Network
    ├── Create Web Subnet
    ├── Create App Subnet
    ├── Create Database Subnet
-   └── Create Public IP
+   ├── Create Public IP (Static)
+   ├── Create Traffic Manager Profile
+   │   ├── Configure DNS (bluegreen-tm-dev.trafficmanager.net)
+   │   ├── Configure Health Monitoring (HTTPS:443)
+   │   └── Set Routing Method (Priority)
+   └── Create Traffic Manager Endpoint
+       ├── Link to Public IP
+       └── Configure Weight (100) and Always Serve
 
 Step 2: Database Module
    ├── Create MSSQL Server
@@ -297,6 +340,7 @@ Step 3: Compute Module
    │   └── Configure DB Connection String
    ├── Create Blue Slot (staging)
    ├── Create Green Slot (staging2)
+   ├── Set Active Slot (Blue Slot)
    ├── Configure VNet Integration (Production)
    ├── Configure VNet Integration (Blue Slot)
    └── Configure VNet Integration (Green Slot)
@@ -383,6 +427,27 @@ Step 4: Security Module
 
 ## 🔍 Slot Configuration
 
+### Active Slot Management
+
+The infrastructure uses `azurerm_web_app_active_slot` to explicitly designate which deployment slot is active:
+
+```hcl
+resource "azurerm_web_app_active_slot" "acive_slot" {
+  slot_id = azurerm_linux_web_app_slot.blue.id
+}
+```
+
+**Benefits:**
+- **Explicit Control**: Terraform manages which slot receives production traffic
+- **Declarative State**: Active slot is defined in code, not just through portal/CLI
+- **Consistent Deployments**: Ensures the correct slot is active across environments
+- **Auditability**: Changes to active slot are tracked in version control
+
+**Default Configuration:**
+- Blue Slot is set as the active slot by default
+- Can be changed by updating the `slot_id` reference
+- Requires manual swap operations to change traffic routing
+
 ### Production Slot
 - **Name**: `bluegreen-webapp-dev`
 - **Environment**: Production
@@ -405,6 +470,25 @@ Step 4: Security Module
 - **Database Connection**: Same as production (shared)
 
 ## 📈 Monitoring and Health Checks
+
+### Traffic Manager Health Monitoring
+```
+Protocol: HTTPS
+Port: 443
+Path: /
+Interval: 30 seconds
+Timeout: 10 seconds
+Tolerated Failures: 3
+Endpoint Weight: 100
+Always Serve: Enabled
+```
+
+**Traffic Manager Benefits:**
+- **DNS-level Failover**: Automatic traffic routing based on endpoint health
+- **Global Load Balancing**: Distribute traffic across regions (if multi-region)
+- **Performance Routing**: Route users to nearest healthy endpoint
+- **Monitoring**: Continuous health checks every 30 seconds
+- **Fast TTL**: 100-second TTL for quick DNS propagation
 
 ### Application Gateway Health Probe
 ```
@@ -455,6 +539,33 @@ MSSQL Database:
   Lifecycle: prevent_destroy enabled
 ```
 
+### Traffic Manager Configuration
+```hcl
+Profile:
+  Name: bluegreen-traman-dev
+  Status: Enabled
+  Routing Method: Priority
+  
+DNS Configuration:
+  Relative Name: bluegreen-tm-dev
+  FQDN: bluegreen-tm-dev.trafficmanager.net
+  TTL: 100 seconds
+  
+Health Monitoring:
+  Protocol: HTTPS
+  Port: 443
+  Path: /
+  Interval: 30 seconds
+  Timeout: 10 seconds
+  Tolerated Failures: 3
+  
+Endpoint:
+  Type: Azure Endpoint
+  Target: Public IP (Static)
+  Weight: 100
+  Always Serve: Enabled
+```
+
 ### Application Gateway Configuration
 ```hcl
 SKU: WAF_v2
@@ -478,8 +589,10 @@ WAF Policy:
 ## 📝 Best Practices Implemented
 
 1. **High Availability**
+   - Traffic Manager for DNS-level health monitoring and routing
    - Application Gateway autoscaling (2-5 instances)
    - Multiple deployment slots for zero-downtime deployments
+   - Active slot configuration managed via Infrastructure as Code
 
 2. **Security**
    - WAF with OWASP 3.2 rules
@@ -515,6 +628,13 @@ terraform apply
 # Verify deployment
 az webapp list --resource-group bluegreen-rg-dev --output table
 az webapp deployment slot list --resource-group bluegreen-rg-dev --name bluegreen-webapp-dev --output table
+
+# Verify Traffic Manager
+az network traffic-manager profile list --resource-group bluegreen-rg-dev --output table
+az network traffic-manager endpoint list --resource-group bluegreen-rg-dev --profile-name bluegreen-traman-dev --output table
+
+# Test DNS resolution
+nslookup bluegreen-tm-dev.trafficmanager.net
 ```
 
 ## 📚 Additional Resources

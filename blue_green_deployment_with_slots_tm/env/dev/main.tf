@@ -56,3 +56,11 @@ module "database" {
     administrator_password = var.administrator_password
 
 }
+
+module "monitoring" {
+    source              = "../../modules/monitoring"
+    project_name        = var.project_name
+    environment         = var.environment
+    location            = var.location
+    resource_group_name = azurerm_resource_group.name.name
+}
