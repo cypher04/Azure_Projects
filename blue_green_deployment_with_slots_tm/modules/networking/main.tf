@@ -1,5 +1,14 @@
 
 
+resource "random_id" "server" {
+    byte_length = 4
+
+    keepers = {
+      azi = 1
+    }
+
+}
+
 resource "azurerm_virtual_network" "vnet" {
     name                = "${var.project_name}-vnet-${var.environment}"
     address_space       = var.address_space
@@ -35,4 +44,36 @@ resource "azurerm_public_ip" "pip" {
   resource_group_name = var.resource_group
   allocation_method   = "Static"
 }
+
+
+resource "azurerm_traffic_manager_profile" "traman" {
+    name                = "${var.project_name}-traman-${var.environment}"
+    resource_group_name = var.resource_group
+    profile_status     = "Enabled"
+    traffic_routing_method = "Priority"
+    
+    dns_config {
+        relative_name = "${var.project_name}-tm-${var.environment}"
+        ttl           = 100
+    }
+    
+    monitor_config {
+        protocol = "HTTPS"
+        port     = 443
+        path     = "/"
+        interval_in_seconds = 30
+        timeout_in_seconds  = 10
+        tolerated_number_of_failures = 3
+    }
+}
+
+resource "azurerm_traffic_manager_azure_endpoint" "tramanend" {
+    name                = "${var.project_name}-traman-endpoint-${var.environment}"
+    profile_id = azurerm_traffic_manager_profile.traman.id
+    target_resource_id = azurerm_public_ip.pip.id
+    always_serve_enabled = true
+    weight = 100
+}
+
+
 
