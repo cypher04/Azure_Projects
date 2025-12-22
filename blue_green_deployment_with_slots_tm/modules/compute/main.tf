@@ -23,6 +23,7 @@ resource "azurerm_service_plan" "serveplan" {
       }
       auth_settings {
         enabled = true
+        unauthenticated_client_action = "RedirectToLoginPage"
       }
 
       site_config {}
