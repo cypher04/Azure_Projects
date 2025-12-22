@@ -5,6 +5,9 @@ resource "azurerm_application_gateway" "appgw" {
     name                = "${var.project_name}-appgw-${var.environment}"
     location            = var.location
     resource_group_name = var.resource_group
+    identity {
+        type = "SystemAssigned"
+    }
 
     sku {
         name     = "WAF_v2"
