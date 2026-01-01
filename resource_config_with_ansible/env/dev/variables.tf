@@ -55,3 +55,8 @@ variable "ssh_public_key_path" {
   description = "The file path to the SSH public key"
   type        = string
 }
+
+variable "virtual_machine_scale_set_id" {
+  description = "The ID of the virtual machine scale set"
+  type        = string
+}

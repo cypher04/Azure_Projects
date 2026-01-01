@@ -29,32 +29,13 @@ variable "subnet_ids" {
     type        = list(string)
 }
 
-variable "administrator_login" {
-    description = "The administrator username for the virtual machine"
-    type        = string
-}
-
-variable "administrator_password" {
-    description = "The administrator password for the virtual machine"
-    type        = string
-    sensitive   = true
-}
-
-variable "ssh_public_key_path" {
-    description = "The file path to the SSH public key"
-    type        = string
-}
-
 variable "monitoring_workspace_name" {
     description = "The name of the monitoring workspace"
     type        = string
     default     = "monitoring-ws"
 }
 
-variable "vm_ids" {
-    description = "A list of virtual machine IDs to monitor"
-    type        = list(string)
-}
+
 
 variable "virtual_machine_scale_set_id" {
     description = "A list of virtual machine scale set IDs to monitor"
