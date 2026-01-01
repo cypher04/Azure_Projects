@@ -7,6 +7,11 @@ resource "azurerm_linux_virtual_machine_scale_set" "lvmss" {
     admin_username      = var.administrator_login
     admin_password      = var.administrator_password
     disable_password_authentication = false
+
+
+    identity {
+        type = "SystemAssigned"
+    }
     
     source_image_reference {
         publisher = "Canonical"
