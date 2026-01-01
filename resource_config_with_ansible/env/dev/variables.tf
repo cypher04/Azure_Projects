@@ -35,10 +35,10 @@ variable "tags" {
 }
 
 
-variable "subnet_ids" {
-  description = "A list of subnet IDs"
-  type        = list(string)
-}
+# variable "subnet_ids" {
+#   description = "A list of subnet IDs"
+#   type        = list(string)
+# }
 
 
 variable "administrator_login" {
@@ -56,7 +56,3 @@ variable "ssh_public_key_path" {
   type        = string
 }
 
-variable "virtual_machine_scale_set_id" {
-  description = "The ID of the virtual machine scale set"
-  type        = string
-}

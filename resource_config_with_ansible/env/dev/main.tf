@@ -34,7 +34,7 @@ module "networking" {
   subnet_prefixes     = var.subnet_prefixes
   address_space       = var.address_space
   resource_group      = azurerm_resource_group.rg-main.name
-  subnet_ids         = var.subnet_ids
+  subnet_ids         = module.networking.subnet_ids
 }
 
 
@@ -57,7 +57,7 @@ module "monitoring" {
   environment         = var.environment
   location            = var.location
   resource_group_name      = azurerm_resource_group.rg-main.name
-  virtual_machine_scale_set_id = module.compute.virtual_machine_scale_set_id
+  virtual_machine_scale_set_id = [module.compute.virtual_machine_scale_set_id]
   subnet_ids = module.networking.subnet_ids
 
   depends_on = [ module.compute]
