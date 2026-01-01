@@ -1,0 +1,10 @@
+package_update: true
+package_upgrade: true
+
+packages:
+  - ansible
+  - git
+
+runcmd:
+  - git clone https://https://github.com/cypher04/Ansible.git /opt/ansible
+  - ansible-playbook /opt/ansible/playbooks/setup.yml
