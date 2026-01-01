@@ -40,7 +40,6 @@ variable "monitoring_workspace_name" {
 variable "virtual_machine_scale_set_id" {
     description = "A list of virtual machine scale set IDs to monitor"
     type        = list(string)
-  
 }
 
 

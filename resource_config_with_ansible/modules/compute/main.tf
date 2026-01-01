@@ -23,7 +23,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "lvmss" {
         version   = "latest"
     }
 
-custom_data = filebase64sha256("../scripts/cloud-init.yaml")
+custom_data = base64encode(file("${path.module}/../../scripts/cloud-init.yaml"))
     
     os_disk {
         caching              = "ReadWrite"

@@ -2,7 +2,7 @@ resource "azurerm_monitor_autoscale_setting" "asmonitoring" {
   name                = "${var.project_name}-as-monitoring-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
-  target_resource_id  = module.compute.virtual_machine_scale_set_id
+  target_resource_id  = var.virtual_machine_scale_set_id[0]
 
   profile {
     name = "defaultProfile" 
@@ -16,7 +16,7 @@ resource "azurerm_monitor_autoscale_setting" "asmonitoring" {
     rule {
       metric_trigger {
         metric_name        = "Percentage CPU"
-        metric_resource_id = module.compute.virtual_machine_scale_set_id
+        metric_resource_id = var.virtual_machine_scale_set_id[0]
         time_grain         = "PT1M"
         statistic          = "Average"
         time_window        = "PT5M"
@@ -26,7 +26,7 @@ resource "azurerm_monitor_autoscale_setting" "asmonitoring" {
         metric_namespace = "Microsoft.Compute/virtualMachineScaleSets"
         dimensions {
             name  = "VMSSName"
-            values = "App1vmss"
+            values = ["App1"]
             operator = "Equals"
         }
       }
@@ -42,7 +42,7 @@ resource "azurerm_monitor_autoscale_setting" "asmonitoring" {
     rule {
       metric_trigger {
         metric_name        = "Percentage CPU"
-        metric_resource_id = module.compute.virtual_machine_scale_set_id
+        metric_resource_id = var.virtual_machine_scale_set_id[0]
         time_grain         = "PT1M"
         statistic          = "Average"
         time_window        = "PT5M"
