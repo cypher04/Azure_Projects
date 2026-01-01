@@ -18,14 +18,12 @@ module "compute" {
   project_name        = var.project_name
   environment         = var.environment
   location            = var.location
-  resource_group      = azurerm_resource_group.rg-main.name
-  subnet_ids          = [module.networking.subnet_ids["web"], module.networking.subnet_ids["app"], module.networking.subnet_ids["database"]]
+  resource_group_name = azurerm_resource_group.rg-main.name
+  subnet_ids          = module.networking.subnet_ids
   administrator_login = var.administrator_login
   administrator_password = var.administrator_password
-  server_name         = var.server_name
-  database_name       = var.database_name
-
-  depends_on = [module.database]
+  ssh_public_key_path = var.ssh_public_key_path
+  depends_on = [module.networking]
 }
 
 module "networking" {

@@ -1,16 +1,19 @@
 resource "azurerm_linux_virtual_machine_scale_set" "lvmss" {
     name                = "${var.project_name}-${var.environment}-lvmss"
     location            = var.location
-    resource_group_name = var.resource_group
+    resource_group_name = var.resource_group_name
     sku                 = "Standard_DS1_v2"
-    instances           = 2
+    instances           = 4
     admin_username      = var.administrator_login
     admin_password      = var.administrator_password
     disable_password_authentication = false
-
-
     identity {
         type = "SystemAssigned"
+    }
+
+    admin_ssh_key {
+        username   = var.administrator_login
+        public_key = file(var.ssh_public_key_path)
     }
     
     source_image_reference {
@@ -41,3 +44,11 @@ custom_data = filebase64sha256("../scripts/cloud-init.yaml")
     tags = var.tags
 }
 
+
+resource "azurerm_ssh_public_key" "ssh_key" {
+    name                = "${var.project_name}-${var.environment}-sshkey"
+    location            = var.location
+    resource_group_name = var.resource_group_name
+    public_key          = file(var.ssh_public_key_path)
+  
+}
