@@ -16,10 +16,16 @@ The infrastructure consists of the following components:
   - Configured with both SSH key and password authentication
   - System-assigned managed identity enabled
   - Automated configuration via cloud-init
+  - Integrated with Azure Load Balancer backend pool
 
 ### Networking
 - **Virtual Network**: Custom VNet with configurable address space
 - **Subnet**: Dedicated subnet for VMSS instances
+- **Azure Load Balancer**: Standard SKU load balancer for traffic distribution
+  - Public IP address for external access
+  - Backend address pool connected to VMSS instances
+  - Health probe monitoring on port 80
+  - Load balancing rule for HTTP traffic (port 80)
 
 ### Monitoring & Auto-scaling
 - **Azure Monitor Autoscale Settings**:
@@ -76,6 +82,7 @@ Key variables defined in `env/dev/terraform.tfvars`:
 | `administrator_login` | Admin username |
 | `administrator_password` | Admin password (sensitive) |
 | `ssh_public_key_path` | Path to SSH public key |
+| `load_balancer_backend_address_pool_id` | Load balancer backend pool ID (internal) |
 
 ## Deployment
 

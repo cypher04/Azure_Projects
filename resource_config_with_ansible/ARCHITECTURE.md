@@ -12,6 +12,24 @@ This document describes the technical architecture of the Azure VM Scale Set inf
 │  (rg-resource_config_with_ansible-{environment})                │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────┐    │
+│  │           Azure Load Balancer (Standard SKU)           │    │
+│  │  ┌─────────────────┐    ┌──────────────────────┐      │    │
+│  │  │   Public IP     │───▶│  Frontend IP Config  │      │    │
+│  │  │   (Static)      │    │                      │      │    │
+│  │  └─────────────────┘    └──────────┬───────────┘      │    │
+│  │                                    │                   │    │
+│  │                         ┌──────────▼───────────┐       │    │
+│  │                         │  LB Rule (Port 80)   │       │    │
+│  │                         └──────────┬───────────┘       │    │
+│  │                         ┌──────────▼───────────┐       │    │
+│  │                         │  Health Probe (80)   │       │    │
+│  │                         └──────────┬───────────┘       │    │
+│  │                         ┌──────────▼───────────┐       │    │
+│  │                         │  Backend Pool        │       │    │
+│  │                         └──────────┬───────────┘       │    │
+│  └────────────────────────────────────┼────────────────────┘    │
+│                                       │                          │
+│  ┌────────────────────────────────────▼───────────────────┐    │
 │  │              Virtual Network                           │    │
 │  │                                                         │    │
 │  │  ┌───────────────────────────────────────────────┐    │    │
@@ -28,6 +46,7 @@ This document describes the technical architecture of the Azure VM Scale Set inf
 │  │  │   │       └──────────┴──────────┘        │   │    │    │
 │  │  │   │              │                        │   │    │    │
 │  │  │   │         NIC (Primary)                 │   │    │    │
+│  │  │   │     (Connected to LB Backend Pool)    │   │    │    │
 │  │  │   └──────────────────────────────────────┘   │    │    │
 │  │  │                                               │    │    │
 │  │  └───────────────────────────────────────────────┘    │    │
@@ -78,6 +97,32 @@ This document describes the technical architecture of the Azure VM Scale Set inf
 - **Purpose**: Dedicated network segment for VM Scale Set instances
 - **Resource**: `azurerm_subnet.subnet`
 
+#### Azure Load Balancer
+- **Resource**: `azurerm_lb.lb`
+- **SKU**: Standard
+- **Name Pattern**: `{project_name}-lb-{environment}`
+- **Components**:
+  - **Frontend IP Configuration**: Named "PublicIPAddress", connected to public IP
+  - **Backend Address Pool**: `azurerm_lb_backend_address_pool.lbap`
+    - Name Pattern: `{project_name}-lb-backend-pool-{environment}`
+    - Connected to VMSS instances
+  - **Health Probe**: `azurerm_lb_probe.lbprobe`
+    - Protocol: TCP
+    - Port: 80
+    - Interval: 15 seconds
+    - Number of probes: 2
+  - **Load Balancing Rule**: `azurerm_lb_rule.lbr`
+    - Protocol: TCP
+    - Frontend Port: 80
+    - Backend Port: 80
+
+#### Public IP Address
+- **Resource**: `azurerm_public_ip.public_ip`
+- **SKU**: Standard (required for Standard Load Balancer)
+- **Allocation Method**: Static
+- **Name Pattern**: `{project_name}-public-ip-{environment}`
+- **Purpose**: Provides external access point for the load balancer
+
 ### 3. Compute Layer
 
 #### Linux Virtual Machine Scale Set
@@ -104,6 +149,7 @@ This document describes the technical architecture of the Azure VM Scale Set inf
   - Name: `{project_name}-{environment}-ipconfig`
   - Subnet: First subnet from networking module
   - IP Version: IPv4
+  - Load Balancer Integration: Connected to backend address pool
 
 ### 4. Configuration Management Layer
 
@@ -174,12 +220,15 @@ azurerm_resource_group
     ↓
     ├─→ module.networking
     │       ↓
-    │   (Creates VNet & Subnet)
+    │   (Creates VNet, Subnet, Load Balancer, Public IP)
+    │       ↓
+    │   (Outputs: subnet_ids, lb_backend_pool_id)
     │       ↓
     ├─→ module.compute ─────────────────┐
     │   (depends_on: networking)        │
+    │   (receives: lb_backend_pool_id)  │
     │       ↓                            │
-    │   (Creates VMSS)                   │
+    │   (Creates VMSS with LB integration)│
     │       ↓                            │
     └─→ module.monitoring ───────────────┘
         (depends_on: compute)
@@ -194,10 +243,15 @@ azurerm_resource_group
   - `project_name`, `environment`, `location`
   - `address_space`, `subnet_prefixes`
   - `resource_group`
+  - `subnet_ids`: Self-reference for load balancer configuration
+  - `load_balancer_backend_address_pool_id`: Self-reference output
 - **Outputs**:
   - `subnet_ids`: List of created subnet IDs
-  - `vnet_id`: Virtual network ID
-- **Resources**: VNet, Subnet
+  - `virtual_network_id`: Virtual network ID
+  - `load_balancer_id`: Load balancer resource ID
+  - `public_ip_id`: Public IP address ID
+  - `load_balancer_backend_address_pool_id`: Backend pool ID for VMSS integration
+- **Resources**: VNet, Subnet, Load Balancer, Public IP, Backend Pool, Health Probe, LB Rule
 
 #### Compute Module (`modules/compute`)
 - **Inputs**:
@@ -205,11 +259,12 @@ azurerm_resource_group
   - `resource_group_name`, `subnet_ids`
   - `administrator_login`, `administrator_password`
   - `ssh_public_key_path`
+  - `load_balancer_backend_address_pool_id`: For LB integration
 - **Outputs**:
   - `virtual_machine_scale_set_id`: VMSS resource ID
   - `subnet_ids`: Pass-through from input
 - **Resources**: 
-  - Linux VM Scale Set
+  - Linux VM Scale Set (with LB backend pool association)
   - SSH Public Key resource
 
 #### Monitoring Module (`modules/monitoring`)
@@ -264,11 +319,19 @@ Terraform Apply
     ↓
 Create Resource Group
     ↓
-Deploy VNet & Subnet
-    ↓
+Deploy Networking Resources
+    ├─→ Create VNet & Subnet
+    ├─→ Create Public IP (Static)
+    ├─→ Create Load Balancer (Standard)
+    ├─→ Configure Frontend IP
+    ├─→ Create Backend Address Pool
+    ├─→ Configure Health Probe (TCP:80)
+    └─→ Create Load Balancing Rule (80→80)
+        ↓
 Deploy VM Scale Set
     ├─→ Read SSH public key from local file
     ├─→ Encode cloud-init script
+    ├─→ Associate NIC with LB Backend Pool
     └─→ Create VMs with custom_data
         ↓
     Cloud-init executes on each VM
@@ -309,9 +372,11 @@ New VM Joins Scale Set
 3. **Managed Identity**: System-assigned for Azure resource access
 
 ### Network Security
-- Private IP addressing within VNet
+- Private IP addressing within VNet for VMs
 - Subnet-level isolation
-- No public IP addresses configured on individual VMs (can be added if needed)
+- Public IP address on Load Balancer (not on individual VMs)
+- Traffic routing through Load Balancer frontend
+- Health probe monitoring ensures only healthy instances receive traffic
 
 ### Access Control
 - Admin credentials managed via Terraform variables
@@ -337,11 +402,14 @@ New VM Joins Scale Set
 - **Instance Count**: Configurable minimum ensures service continuity
 - **Auto-healing**: Scale set can replace unhealthy instances
 - **Update Mode**: Configurable upgrade mode
+- **Load Balancer**: Distributes traffic across healthy instances
+- **Health Probes**: Continuous health monitoring on port 80
+- **Automatic Failover**: Traffic redirected away from unhealthy instances
 
 ### Limitations
 - Single subnet deployment
 - No availability zones configured
-- No load balancer configured (would need to be added for public access)
+- Single region deployment
 
 ## Configuration Management
 
@@ -378,16 +446,17 @@ New VM Joins Scale Set
 ## Future Enhancements
 
 ### Potential Additions
-1. **Load Balancer**: For public traffic distribution
-2. **Application Gateway**: For HTTP/HTTPS traffic with WAF
-3. **Database Integration**: Deploy accompanying database resources
-4. **Security Hardening**: Enable NSG rules, disable password auth
-5. **Monitoring Enhancement**: Add Log Analytics workspace, Application Insights
-6. **Backup**: Configure Azure Backup for VM protection
-7. **Availability Zones**: Distribute VMs across zones for better HA
-8. **Private Endpoints**: For enhanced security
-9. **Key Vault Integration**: For secrets management
-10. **CI/CD Pipeline**: Automate Terraform deployments
+1. **Application Gateway**: For HTTP/HTTPS traffic with WAF capabilities
+2. **Database Integration**: Deploy accompanying database resources
+3. **Security Hardening**: Enable NSG rules, disable password auth
+4. **Monitoring Enhancement**: Add Log Analytics workspace, Application Insights
+5. **Backup**: Configure Azure Backup for VM protection
+6. **Availability Zones**: Distribute VMs across zones for better HA
+7. **Private Endpoints**: For enhanced security
+8. **Key Vault Integration**: For secrets management
+9. **CI/CD Pipeline**: Automate Terraform deployments
+10. **SSL/TLS Termination**: Configure HTTPS on load balancer
+11. **Multiple Backend Pools**: For different application tiers
 
 ## Maintenance Considerations
 
