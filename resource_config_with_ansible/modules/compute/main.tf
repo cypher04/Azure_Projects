@@ -38,8 +38,10 @@ custom_data = base64encode(file("${path.module}/../../scripts/cloud-init.yaml"))
         name      = "${var.project_name}-${var.environment}-ipconfig"
         subnet_id = element(var.subnet_ids, 0)
         primary   = true
+        load_balancer_backend_address_pool_ids = [var.load_balancer_backend_address_pool_id]
         }
     }
+    
     
     tags = var.tags
 }

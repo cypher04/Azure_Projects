@@ -47,3 +47,8 @@ variable "subnet_ids" {
   description = "A list of subnet IDs for the virtual machine scale set"
   type        = list(string)
 }
+
+variable "load_balancer_backend_address_pool_id" {
+  description = "The ID of the load balancer backend address pool"
+  type        = string
+}

@@ -23,6 +23,7 @@ module "compute" {
   administrator_login = var.administrator_login
   administrator_password = var.administrator_password
   ssh_public_key_path = var.ssh_public_key_path
+  load_balancer_backend_address_pool_id = module.networking.load_balancer_backend_address_pool_id
   depends_on = [module.networking]
 }
 
@@ -35,6 +36,8 @@ module "networking" {
   address_space       = var.address_space
   resource_group      = azurerm_resource_group.rg-main.name
   subnet_ids         = module.networking.subnet_ids
+  load_balancer_backend_address_pool_id = module.networking.load_balancer_backend_address_pool_id
+  
 }
 
 

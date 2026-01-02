@@ -56,3 +56,9 @@ variable "ssh_public_key_path" {
   type        = string
 }
 
+
+variable "load_balancer_backend_address_pool_id" {
+  description = "The ID of the load balancer backend address pool"
+  type        = string
+  
+}
