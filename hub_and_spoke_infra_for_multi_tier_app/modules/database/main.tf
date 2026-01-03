@@ -7,6 +7,8 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
     consistency_policy {
         consistency_level       = "Session"
     }
+
+    public_network_access_enabled = false
     geo_location {
         location          = var.location
         failover_priority = 0
@@ -45,6 +47,19 @@ resource "azurerm_cosmosdb_sql_container" "sqlcontainer" {
     }
 
 }
+
+// add database and virtual network cconnection
+
+resource "azurerm_cosmosdb_virtual_network_rule" "vnet_rule" {
+    resource_group_name  = var.resource_group.name
+    account_name        = azurerm_cosmosdb_account.cosmosdb.name
+    subnet_id           = var.subnet_ids[0]
+    ignore_missing_vnet_service_endpoint = true
+}
+
+
+
+
 
 
 
