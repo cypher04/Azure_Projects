@@ -27,3 +27,13 @@ variable "subnet_prefixes" {
     description = "A list of subnet prefixes"
     type        = list(string)
 }
+
+variable "delegation_subnet" {
+    description = "A list of subnet prefixes for delegated subnets"
+    type        = list(string)   
+}
+
+variable "subnet_ids" {
+    description = "A list of subnet IDs"
+    type        = list(string)
+}

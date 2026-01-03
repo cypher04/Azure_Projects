@@ -28,13 +28,18 @@ variable "subnet_prefixes" {
     type        = list(string)
 }
 
-variable "tags" {
-    description = "A map of tags to assign to resources"
-    type        = map(string)
-}
+# variable "tags" {
+#     description = "A map of tags to assign to resources"
+#     type        = map(string)
+# }
 
 variable "subnet_ids" {
     description = "A list of subnet IDs"
+    type        = list(string)
+}
+
+variable "delegation_subnet" {
+    description = "The delegation for the subnet"
     type        = list(string)
 }
 

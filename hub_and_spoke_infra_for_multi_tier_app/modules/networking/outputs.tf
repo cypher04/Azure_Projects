@@ -35,3 +35,7 @@ output "virtual_network_name_spoke_2" {
     value = azurerm_virtual_network.vnet-spoke-2.name
 }
 
+output "delegation_subnet_id" {
+    value = azurerm_subnet.del-subnet.id
+}
+

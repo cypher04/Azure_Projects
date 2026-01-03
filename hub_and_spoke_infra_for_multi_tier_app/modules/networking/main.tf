@@ -4,7 +4,7 @@ resource "azurerm_virtual_network" "vnet-hub" {
     location            = var.location
     resource_group_name = var.resource_group.name
     
-    tags = var.tags
+    # tags = var.tags
 }
 
 resource "azurerm_subnet" "hub-subnet" {
@@ -13,7 +13,22 @@ resource "azurerm_subnet" "hub-subnet" {
     virtual_network_name = azurerm_virtual_network.vnet-hub.name
     address_prefixes     = [var.subnet_prefixes[0]]
     
-    
+}
+
+
+resource "azurerm_subnet" "del-subnet" {
+    name                 = "${var.project_name}-subnet-vmss-${var.environment}"
+    resource_group_name  = var.resource_group.name
+    virtual_network_name = azurerm_virtual_network.vnet-hub.name
+    address_prefixes     = var.delegation_subnet
+delegation {
+    name = "${var.project_name}-delegation-${var.environment}"
+    service_delegation {
+      name = "Microsoft.ContainerInstance/containerGroups"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action", "Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action"]
+    }
+}
+
 }
 
 resource "azurerm_virtual_network" "vnet-spoke-1" {

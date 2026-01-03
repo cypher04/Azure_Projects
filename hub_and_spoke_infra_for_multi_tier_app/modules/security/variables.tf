@@ -18,11 +18,6 @@ variable "environment" {
     type        = string
 }
 
-variable "tags" {
-    description = "A map of tags to assign to resources"
-    type        = map(string)
-}
-
 variable "network_security_group_name" {
     description = "The name of the network security group"
     type        = string

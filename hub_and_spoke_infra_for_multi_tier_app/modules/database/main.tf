@@ -9,6 +9,7 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
     }
 
     public_network_access_enabled = false
+    
     geo_location {
         location          = var.location
         failover_priority = 0

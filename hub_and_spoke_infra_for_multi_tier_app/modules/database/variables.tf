@@ -18,10 +18,10 @@ variable "environment" {
     type        = string
 }
 
-variable "tags" {
-    description = "A map of tags to assign to resources"
-    type        = map(string)
-}
+# variable "tags" {
+#     description = "A map of tags to assign to resources"
+#     type        = map(string)
+# }
 
 variable "subnet_ids" {
     description = "A list of subnet IDs"
