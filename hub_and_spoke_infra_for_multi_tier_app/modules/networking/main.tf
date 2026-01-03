@@ -87,6 +87,36 @@ resource "azurerm_virtual_network_peering" "spoke2-to-hub" {
 }
 
 
+resource "azurerm_public_ip" "public_ip" {
+    name                = "${var.project_name}-public-ip-${var.environment}"
+    location            = var.location
+    resource_group_name = var.resource_group.name
+    allocation_method   = "Static"
+    sku                 = "Standard"
+}
+
+
+// finally, connect the App Service to the VNet using Swift Connection for outbound traffic
+resource "azurerm_app_service_virtual_network_swift_connection" "name" {
+    app_service_id      = module.compute.linux_web_app_id
+    subnet_id           = azurerm_subnet.del-subnet.id
+}
+
+
+resource "azurerm_private_endpoint" "pe-appservice" {
+    name                = "${var.project_name}-pe-appservice-${var.environment}"
+    location            = var.location
+    resource_group_name = var.resource_group.name
+    subnet_id           = azurerm_subnet.del-subnet.id
+
+    private_service_connection {
+        name                           = "${var.project_name}-psc-appservice-${var.environment}"
+        private_connection_resource_id = module.compute.linux_web_app_id
+        is_manual_connection           = false
+        subresource_names              = ["sites"]
+    }
+  
+}
 
 
 
