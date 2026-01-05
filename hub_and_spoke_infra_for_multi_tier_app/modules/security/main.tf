@@ -3,28 +3,28 @@
 resource "azurerm_network_security_group" "nsg-hub-subnet-database" {
     name                = "${var.project_name}-nsg-${var.environment}"
     location            = var.location
-    resource_group_name = var.resource_group.name
+    resource_group_name = var.resource_group
 }
 
-resource "azurerm_network_security_rule" "allow_https" {
+resource "azurerm_network_security_rule" "allow_https_for_database" {
     name                        = "Allow-HTTPS"
     priority                    = 100
     direction                   = "Inbound"
     access                      = "Allow"
     protocol                    = "Tcp"
-    source_port_range           = "443"
+    source_port_range           = "*"
     destination_port_range      = "443"
-    source_address_prefix       = [var.subnet_prefixes[1]]
-    destination_address_prefix  = [var.subnet_prefixes[1]]
+    source_address_prefix       = var.subnet_prefixes[1]
+    destination_address_prefix  = var.subnet_prefixes[1]
     network_security_group_name = azurerm_network_security_group.nsg-hub-subnet-database.name
-    resource_group_name         = var.resource_group.name
+    resource_group_name         = var.resource_group
 }
 
 
 resource "azurerm_network_security_rule" "deny_all_inbound" {
     name                        = "deny-all-inbound"
     priority                    = 101
-    direction                   = "inbound"
+    direction                   = "Inbound"
     access                      = "Deny"
     protocol                    = "Tcp"
     source_port_range           = "*"
@@ -32,7 +32,7 @@ resource "azurerm_network_security_rule" "deny_all_inbound" {
     source_address_prefix       = "*"
     destination_address_prefix  = "*"
     network_security_group_name = azurerm_network_security_group.nsg-hub-subnet-database.name
-    resource_group_name         = var.resource_group.name
+    resource_group_name         = var.resource_group
 }
 
 
@@ -40,7 +40,7 @@ resource "azurerm_network_security_rule" "deny_all_inbound" {
 resource "azurerm_network_security_group" "nsg-web-subnet" {
     name                = "${var.project_name}-nsg-web-${var.environment}"
     location            = var.location
-    resource_group_name = var.resource_group.name
+    resource_group_name = var.resource_group
   
 }
 
@@ -55,8 +55,8 @@ resource "azurerm_network_security_rule" "allow_https" {
     destination_port_range      = "443"
     source_address_prefix       = "*"
     destination_address_prefix  = "*"
-    network_security_group_name = azurerm_network_security_group.nsg-web
-    resource_group_name         = var.resource_group.name
+    network_security_group_name = azurerm_network_security_group.nsg-web-subnet.name
+    resource_group_name         = var.resource_group
 }
 
 
@@ -67,24 +67,24 @@ resource "azurerm_network_security_rule" "allow_https" {
 resource "azurerm_network_security_group" "nsg-app" {
     name                = "${var.project_name}-nsg-app-${var.environment}"
     location            = var.location
-    resource_group_name = var.resource_group.name
+    resource_group_name = var.resource_group
 }
 
 
 // Associate NSGs with Subnets
 resource "azurerm_subnet_network_security_group_association" "web-nsg-association" {
-    subnet_id                 = [module.networking.subnet_ids[2]]
-    network_security_group_id = azurerm_network_security_group.nsg-web.id
+    subnet_id                 = var.subnet_ids[2]
+    network_security_group_id = azurerm_network_security_group.nsg-web-subnet.id
 }
 
 resource "azurerm_subnet_network_security_group_association" "app-nsg-association" {
-    subnet_id                 = [module.networking.subnet_ids[1]]
+    subnet_id                 = var.subnet_ids[1]
     network_security_group_id = azurerm_network_security_group.nsg-app.id
 }
 
 resource "azurerm_subnet_network_security_group_association" "hub-nsg-association" {
-    subnet_id                 = [module.networking.subnet_ids[0]]
-    network_security_group_id = azurerm_network_security_group.nsg-hub.id
+    subnet_id                 = var.subnet_ids[0]
+    network_security_group_id = azurerm_network_security_group.nsg-hub-subnet-database.id
   
 }
 
@@ -102,7 +102,7 @@ resource "azurerm_network_security_rule" "allow_ssh" {
     source_address_prefix       = var.subnet_prefixes[2]
     destination_address_prefix  = "*"
     network_security_group_name = azurerm_network_security_group.nsg-app.name
-    resource_group_name         = var.resource_group.name
+    resource_group_name         = var.resource_group
 }
 
 resource "azurerm_network_security_rule" "allow_sql" {
@@ -115,8 +115,8 @@ resource "azurerm_network_security_rule" "allow_sql" {
     destination_port_range      = "1433"
     source_address_prefix       = "*"
     destination_address_prefix  = "*"
-    network_security_group_name = azurerm_network_security_group.nsg-hub.name
-    resource_group_name         = var.resource_group.name
+    network_security_group_name = azurerm_network_security_group.nsg-hub-subnet-database.name
+    resource_group_name         = var.resource_group
 }
 
 
@@ -142,7 +142,7 @@ resource "azurerm_application_gateway" "appgw" {
 
     gateway_ip_configuration {
         name      = "appgw-ip-config"
-        subnet_id = [var.subnet_ids[0]]
+        subnet_id = var.subnet_ids[0]
     }
 
     frontend_port {

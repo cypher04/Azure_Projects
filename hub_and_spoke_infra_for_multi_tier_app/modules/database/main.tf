@@ -1,7 +1,7 @@
 resource "azurerm_cosmosdb_account" "cosmosdb" {
-    name                = "${var.project_name}-cosmosdb-${var.environment}"
+    name                = substr(lower(replace("${var.project_name}-cosmos-${var.environment}", "_", "-")), 0, 44)
     location            = var.location
-    resource_group_name = var.resource_group.name
+    resource_group_name = var.resource_group
     offer_type          = "Standard"
     kind                = "GlobalDocumentDB"
     consistency_policy {
@@ -27,14 +27,14 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
 }
 
 resource "azurerm_cosmosdb_sql_database" "sqldb" {
-    name                = "${var.project_name}-sqldb-${var.environment}"
-    resource_group_name = var.resource_group.name
+    name                = lower(replace("${var.project_name}-sqldb-${var.environment}", "_", "-"))
+    resource_group_name = var.resource_group
     account_name       = azurerm_cosmosdb_account.cosmosdb.name
 }
 
 resource "azurerm_cosmosdb_sql_container" "sqlcontainer" {
-    name                = "${var.project_name}-sqlcontainer-${var.environment}"
-    resource_group_name = var.resource_group.name
+    name                = lower(replace("${var.project_name}-sqlcontainer-${var.environment}", "_", "-"))
+    resource_group_name = var.resource_group
     account_name       = azurerm_cosmosdb_account.cosmosdb.name
     database_name      = azurerm_cosmosdb_sql_database.sqldb.name
     partition_key_paths = ["/partitionKey"]
@@ -60,12 +60,14 @@ resource "azurerm_cosmosdb_sql_container" "sqlcontainer" {
 
 // add database and virtual network cconnection
 
-resource "azurerm_cosmosdb_virtual_network_rule" "vnet_rule" {
-    resource_group_name  = var.resource_group.name
-    account_name        = azurerm_cosmosdb_account.cosmosdb.name
-    subnet_id           = var.subnet_ids[0]
-    ignore_missing_vnet_service_endpoint = true
-}
+# resource "azurerm_cosmosdb_virtual_network_rule" "vnet_rule" {
+#     resource_group_name  = var.resource_group.name
+#     account_name        = azurerm_cosmosdb_account.cosmosdb.name
+#     subnet_id           = var.subnet_ids[0]
+#     ignore_missing_vnet_service_endpoint = true
+# }
+
+
 
 
 

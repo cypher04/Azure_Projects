@@ -43,3 +43,21 @@ variable "delegation_subnet" {
     type        = list(string)
 }
 
+variable "app_service_id" {
+    description = "The ID of the App Service for VNet integration"
+    type        = string
+    default     = ""
+}
+
+variable "cosmosdb_account_id" {
+    description = "The ID of the Cosmos DB account for private endpoint"
+    type        = string
+    default     = ""
+}
+
+variable "vnet_spoke_1_id" {
+    description = "The ID of the Spoke 1 Virtual Network"
+    type        = string
+    default     = ""
+}
+

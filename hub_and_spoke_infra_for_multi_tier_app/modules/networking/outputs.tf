@@ -1,6 +1,4 @@
-output "subnet_ids" {
-    value = azurerm_subnet.*.id
-}
+
 
 output "virtual_network_id" {
     value = azurerm_virtual_network.vnet-spoke-1.id
@@ -40,6 +38,6 @@ output "delegation_subnet_id" {
 }
 
 output "public_ip_id" {
-    value = azurerm_public_ip.public-ip.id
+    value = azurerm_public_ip.public_ip.id
 }
 

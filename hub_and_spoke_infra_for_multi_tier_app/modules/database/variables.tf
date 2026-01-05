@@ -29,6 +29,12 @@ variable "subnet_ids" {
 }
 
 
+# variable "database_id" {
+#     description = "The ID of the database subnet"
+#     type        = string
+# }
+
+
 
 
 
