@@ -8,6 +8,15 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
         consistency_level       = "Session"
     }
 
+    identity {
+        type = "SystemAssigned"
+    }
+
+    backup {
+        type = "Periodic"
+        retention_in_hours = 8 //sensitive data
+    }
+
     public_network_access_enabled = false
     
     geo_location {

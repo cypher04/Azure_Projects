@@ -23,6 +23,9 @@ resource "azurerm_linux_web_app" "web_app" {
     client_certificate_enabled = true
     client_certificate_mode = "Required"
     
+    auth_settings {
+      enabled = true
+    }
 
     site_config {
         linux_fx_version = "NODE|14-lts"
