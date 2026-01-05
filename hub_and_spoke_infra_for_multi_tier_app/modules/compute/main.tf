@@ -25,6 +25,8 @@ resource "azurerm_linux_web_app" "web_app" {
     
     auth_settings {
       enabled = true
+      unauthenticated_client_action = "RedirectToLoginPage"
+
     }
 
     site_config {

@@ -14,7 +14,7 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
 
     backup {
         type = "Periodic"
-        retention_in_hours = 8 //sensitive data
+        retention_in_hours = 300 //sensitive data
     }
 
     public_network_access_enabled = false
