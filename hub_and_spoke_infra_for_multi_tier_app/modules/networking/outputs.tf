@@ -39,3 +39,7 @@ output "delegation_subnet_id" {
     value = azurerm_subnet.del-subnet.id
 }
 
+output "public_ip_id" {
+    value = azurerm_public_ip.public-ip.id
+}
+

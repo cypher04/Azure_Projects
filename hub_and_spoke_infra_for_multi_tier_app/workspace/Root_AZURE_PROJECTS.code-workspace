@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"name": "AZURE_PROJECTS",
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"chat.mcp.serverSampling": {},
+		"terraform.mcp.server.enable": true
+	}
+}

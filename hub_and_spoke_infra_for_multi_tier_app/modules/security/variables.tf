@@ -34,3 +34,8 @@ variable "subnet_prefixes" {
     description = "A list of subnet prefixes"
     type        = list(string)
 }
+
+variable "public_ip_id" {
+    description = "The ID of the public IP address"
+    type        = string
+}

@@ -29,7 +29,6 @@ module "networking" {
   subnet_prefixes     = var.subnet_prefixes
   address_space       = var.address_space
   resource_group      = azurerm_resource_group.rg-main.name
-#   public_ip_id        = module.networking.public_ip_id
   delegation_subnet = var.delegation_subnet
   subnet_ids = var.subnet_ids
 }
@@ -53,8 +52,7 @@ module "security" {
   location            = var.location
   resource_group      = azurerm_resource_group.rg-main.name
   subnet_prefixes     = var.subnet_prefixes
-#   public_ip_id        = module.networking.public_ip_id
   subnet_ids          = var.subnet_ids
-
+  public_ip_id = module.networking.public_ip.id
   depends_on = [ module.networking ]
 }

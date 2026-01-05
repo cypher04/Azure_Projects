@@ -102,20 +102,19 @@ resource "azurerm_app_service_virtual_network_swift_connection" "name" {
     subnet_id           = azurerm_subnet.del-subnet.id
 }
 
-
+// Create Private Endpoint for App Service in Spoke 2 VNet for inbound traffic
 resource "azurerm_private_endpoint" "pe-appservice" {
     name                = "${var.project_name}-pe-appservice-${var.environment}"
     location            = var.location
     resource_group_name = var.resource_group.name
-    subnet_id           = azurerm_subnet.del-subnet.id
+    subnet_id           = azurerm_subnet.subnet-spoke-2-app.id
 
     private_service_connection {
         name                           = "${var.project_name}-psc-appservice-${var.environment}"
-        private_connection_resource_id = module.compute.linux_web_app_id
+        private_connection_resource_id = module.compute.linux_web_app.id
         is_manual_connection           = false
         subresource_names              = ["sites"]
     }
-  
 }
 
 
