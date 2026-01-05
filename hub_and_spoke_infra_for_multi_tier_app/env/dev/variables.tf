@@ -36,4 +36,23 @@ variable "delegation_subnet" {
 variable "subnet_ids" {
     description = "A list of subnet IDs"
     type        = list(string)
+    default     = []
 }
+
+variable "public_ip_id" {
+    description = "The ID of the Public IP"
+    type        = string
+}
+
+
+variable "network_security_group_id" {
+    description = "The ID of the Network Security Group"
+    type        = string
+}
+
+variable "vnet_spoke_1_id" {
+    description = "The ID of the Spoke 1 Virtual Network"
+    type        = string
+    default     = ""
+}
+

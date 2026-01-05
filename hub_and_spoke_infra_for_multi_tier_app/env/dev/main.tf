@@ -15,9 +15,11 @@ module "compute" {
   location            = var.location
   resource_group      = azurerm_resource_group.rg-main.name
   subnet_ids          = var.subnet_ids
-  delegation_subnet = var.delegation_subnet
+  delegation_subnet   = var.delegation_subnet
+  cosmosdb_id         = module.database.database_account_id
+  vnet_spoke_1_id     = module.networking.virtual_network_id
 
-  depends_on = [module.networking]
+  depends_on = [module.networking, module.database]
 }
 
 
@@ -29,8 +31,8 @@ module "networking" {
   subnet_prefixes     = var.subnet_prefixes
   address_space       = var.address_space
   resource_group      = azurerm_resource_group.rg-main.name
-  delegation_subnet = var.delegation_subnet
-  subnet_ids = var.subnet_ids
+  delegation_subnet   = var.delegation_subnet
+  subnet_ids          = var.subnet_ids
 }
 
 
@@ -52,7 +54,57 @@ module "security" {
   location            = var.location
   resource_group      = azurerm_resource_group.rg-main.name
   subnet_prefixes     = var.subnet_prefixes
-  subnet_ids          = var.subnet_ids
-  public_ip_id = module.networking.public_ip.id
+  subnet_ids          = [
+    module.networking.hub_subnet_database_id,
+    module.networking.subnet_id_spoke_1_web,
+    module.networking.subnet_id_spoke_2_app
+  ]
+  public_ip_id = module.networking.public_ip_id
   depends_on = [ module.networking ]
+}
+
+
+# VNet Integration and Private Endpoints
+# These are created at the root level to avoid circular dependencies between modules
+
+// Connect the App Service to the VNet using Swift Connection for outbound traffic
+resource "azurerm_app_service_virtual_network_swift_connection" "vnet_connection" {
+  app_service_id = module.compute.linux_web_app_id
+  subnet_id      = module.networking.delegation_subnet_id
+
+  depends_on = [module.compute, module.networking]
+}
+
+// Create Private Endpoint for App Service in Spoke 2 VNet for inbound traffic
+resource "azurerm_private_endpoint" "pe-appservice" {
+  name                = "${var.project_name}-pe-appservice-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg-main.name
+  subnet_id           = module.networking.subnet_id_spoke_2_app
+
+  private_service_connection {
+    name                           = "${var.project_name}-psc-appservice-${var.environment}"
+    private_connection_resource_id = module.compute.linux_web_app_id
+    is_manual_connection           = false
+    subresource_names              = ["sites"]
+  }
+
+  depends_on = [module.compute, module.networking]
+}
+
+// Create Private Endpoint for Cosmos DB in Hub VNet for secure database access
+resource "azurerm_private_endpoint" "pe-cosmosdb" {
+  name                = "${var.project_name}-pe-cosmosdb-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg-main.name
+  subnet_id           = module.networking.hub_subnet_database_id
+
+  private_service_connection {
+    name                           = "${var.project_name}-psc-cosmosdb-${var.environment}"
+    private_connection_resource_id = module.database.database_account_id
+    is_manual_connection           = false
+    subresource_names              = ["Sql"]
+  }
+
+  depends_on = [module.database, module.networking]
 }
