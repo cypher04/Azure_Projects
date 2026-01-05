@@ -7,8 +7,8 @@ resource "azurerm_virtual_network" "vnet-hub" {
     # tags = var.tags
 }
 
-resource "azurerm_subnet" "hub-subnet" {
-    name                 = "${var.project_name}-${var.environment}-subnet-web"
+resource "azurerm_subnet" "hub-subnet-database" {
+    name                 = "${var.project_name}-${var.environment}-subnet-database"
     resource_group_name  = var.resource_group.name
     virtual_network_name = azurerm_virtual_network.vnet-hub.name
     address_prefixes     = [var.subnet_prefixes[0]]
@@ -58,6 +58,9 @@ resource "azurerm_subnet" "subnet-spoke-2-app" {
     address_prefixes     = [var.subnet_prefixes[2]]
 }
 
+
+
+// VNet Peerings between Hub and Spokes
 resource "azurerm_virtual_network_peering" "hub-to-spoke1" {
     name                      = "${var.project_name}-hub-to-spoke1-peering-${var.environment}"
     resource_group_name       = var.resource_group.name
@@ -87,6 +90,8 @@ resource "azurerm_virtual_network_peering" "spoke2-to-hub" {
 }
 
 
+
+// Create a Public IP for the App Service Environment
 resource "azurerm_public_ip" "public_ip" {
     name                = "${var.project_name}-public-ip-${var.environment}"
     location            = var.location
@@ -115,6 +120,24 @@ resource "azurerm_private_endpoint" "pe-appservice" {
         is_manual_connection           = false
         subresource_names              = ["sites"]
     }
+}
+
+
+// Create Private Endpoint for Cosmos DB in Hub VNet for secure database access
+
+resource "azurerm_private_endpoint" "pe-cosmosdb" {
+    name                = "${var.project_name}-pe-cosmosdb-${var.environment}"
+    location            = var.location
+    resource_group_name = var.resource_group.name
+    subnet_id           = azurerm_subnet.hub-subnet-database.id
+
+    private_service_connection {
+        name                           = "${var.project_name}-psc-cosmosdb-${var.environment}"
+        private_connection_resource_id = module.database.cosmosdb.id
+        is_manual_connection           = false
+        subresource_names              = ["Sql"]
+    }
+  
 }
 
 

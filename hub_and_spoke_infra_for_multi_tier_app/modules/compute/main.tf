@@ -72,4 +72,3 @@ resource "azurerm_dns_zone_group" "name" {
 
 
 
-

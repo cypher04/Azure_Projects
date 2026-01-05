@@ -1,16 +1,68 @@
-resource "azurerm_network_security_group" "nsg-hub" {
+
+// Network Security Groups and Rules
+resource "azurerm_network_security_group" "nsg-hub-subnet-database" {
     name                = "${var.project_name}-nsg-${var.environment}"
     location            = var.location
     resource_group_name = var.resource_group.name
 }
 
+resource "azurerm_network_security_rule" "allow_https" {
+    name                        = "Allow-HTTPS"
+    priority                    = 100
+    direction                   = "Inbound"
+    access                      = "Allow"
+    protocol                    = "Tcp"
+    source_port_range           = "443"
+    destination_port_range      = "443"
+    source_address_prefix       = [var.subnet_prefixes[1]]
+    destination_address_prefix  = [var.subnet_prefixes[1]]
+    network_security_group_name = azurerm_network_security_group.nsg-hub-subnet-database.name
+    resource_group_name         = var.resource_group.name
+}
 
-resource "azurerm_network_security_group" "nsg-web" {
+
+resource "azurerm_network_security_rule" "deny_all_inbound" {
+    name                        = "deny-all-inbound"
+    priority                    = 101
+    direction                   = "inbound"
+    access                      = "Deny"
+    protocol                    = "Tcp"
+    source_port_range           = "*"
+    destination_port_range      = "443"
+    source_address_prefix       = "*"
+    destination_address_prefix  = "*"
+    network_security_group_name = azurerm_network_security_group.nsg-hub-subnet-database.name
+    resource_group_name         = var.resource_group.name
+}
+
+
+
+resource "azurerm_network_security_group" "nsg-web-subnet" {
     name                = "${var.project_name}-nsg-web-${var.environment}"
     location            = var.location
     resource_group_name = var.resource_group.name
   
 }
+
+
+resource "azurerm_network_security_rule" "allow_https" {
+    name                        = "Allow-HTTPS"
+    priority                    = 100
+    direction                   = "Inbound"
+    access                      = "Allow"
+    protocol                    = "Tcp"
+    source_port_range           = "*"
+    destination_port_range      = "443"
+    source_address_prefix       = "*"
+    destination_address_prefix  = "*"
+    network_security_group_name = azurerm_network_security_group.nsg-web
+    resource_group_name         = var.resource_group.name
+}
+
+
+
+
+
 
 resource "azurerm_network_security_group" "nsg-app" {
     name                = "${var.project_name}-nsg-app-${var.environment}"
@@ -19,6 +71,7 @@ resource "azurerm_network_security_group" "nsg-app" {
 }
 
 
+// Associate NSGs with Subnets
 resource "azurerm_subnet_network_security_group_association" "web-nsg-association" {
     subnet_id                 = [module.networking.subnet_ids[2]]
     network_security_group_id = azurerm_network_security_group.nsg-web.id
@@ -35,19 +88,8 @@ resource "azurerm_subnet_network_security_group_association" "hub-nsg-associatio
   
 }
 
-resource "azurerm_network_security_rule" "allow_http" {
-    name                        = "Allow-HTTP"
-    priority                    = 100
-    direction                   = "Inbound"
-    access                      = "Allow"
-    protocol                    = "Tcp"
-    source_port_range           = "*"
-    destination_port_range      = "80"
-    source_address_prefix       = "*"
-    destination_address_prefix  = "*"
-    network_security_group_name = azurerm_network_security_group.nsg-web
-    resource_group_name         = var.resource_group.name
-}
+
+// NSG Rules
 
 resource "azurerm_network_security_rule" "allow_ssh" {
     name                        = "Allow-SSH"
@@ -57,7 +99,7 @@ resource "azurerm_network_security_rule" "allow_ssh" {
     protocol                    = "Tcp"
     source_port_range           = "*"
     destination_port_range      = "22"
-    source_address_prefix       = "*"
+    source_address_prefix       = var.subnet_prefixes[2]
     destination_address_prefix  = "*"
     network_security_group_name = azurerm_network_security_group.nsg-app.name
     resource_group_name         = var.resource_group.name
