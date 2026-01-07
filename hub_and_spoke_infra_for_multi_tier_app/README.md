@@ -22,18 +22,25 @@ The infrastructure follows a hub-and-spoke network topology pattern:
                     │         + Public IP                      │
                     └─────────────────┬───────────────────────┘
                                       │
+                    ┌─────────────────▼───────────────────────┐
+                    │         Standard Load Balancer           │
+                    │         + Private Link Service           │
+                    └─────────────────┬───────────────────────┘
+                                      │
     ┌─────────────────────────────────┼─────────────────────────────────┐
     │                                 │                                  │
     │                    ┌────────────▼────────────┐                    │
     │                    │       HUB VNET          │                    │
     │                    │  ┌──────────────────┐   │                    │
     │                    │  │ Database Subnet  │   │                    │
-    │                    │  │   (Cosmos DB)    │   │                    │
-    │                    │  │ Private Endpoint │   │                    │
+    │                    │  │   (Cosmos DB     │   │                    │
+    │                    │  │ Private Endpoint)│   │                    │
+    │                    │  │ + Private DNS    │   │                    │
     │                    │  └──────────────────┘   │                    │
     │                    │  ┌──────────────────┐   │                    │
     │                    │  │ Delegation Subnet│   │                    │
     │                    │  │(Container Groups)│   │                    │
+    │                    │  │ VNet Integration │   │                    │
     │                    │  └──────────────────┘   │                    │
     │                    └────────────┬────────────┘                    │
     │                                 │                                  │
@@ -43,10 +50,10 @@ The infrastructure follows a hub-and-spoke network topology pattern:
     │   │    SPOKE 1 VNET     │       │       │    SPOKE 2 VNET     │   │
     │   │  ┌──────────────┐   │◄──────┴──────►│  ┌──────────────┐   │   │
     │   │  │  Web Subnet  │   │  VNet Peering │  │  App Subnet  │   │   │
-    │   │  │              │   │               │  │  (Web App    │   │   │
-    │   │  └──────────────┘   │               │  │   Private    │   │   │
-    │   └─────────────────────┘               │  │   Endpoint)  │   │   │
-    │                                         │  └──────────────┘   │   │
+    │   │  │ + Private DNS│   │               │  │  (Web App    │   │   │
+    │   │  │   Zone Link  │   │               │  │   Private    │   │   │
+    │   │  └──────────────┘   │               │  │   Endpoint)  │   │   │
+    │   └─────────────────────┘               │  └──────────────┘   │   │
     │                                         └─────────────────────┘   │
     └───────────────────────────────────────────────────────────────────┘
 ```
@@ -60,8 +67,11 @@ The infrastructure follows a hub-and-spoke network topology pattern:
 | **Spoke 2 VNet** | Application tier subnet with private endpoints |
 | **VNet Peering** | Bidirectional connectivity between hub and spoke networks |
 | **Application Gateway** | WAF v2 enabled gateway for secure ingress traffic |
+| **Load Balancer** | Standard SKU load balancer with public IP frontend |
+| **Private Link Service** | Enables private endpoint access to Load Balancer |
 | **Azure Cosmos DB** | NoSQL database with private endpoint for secure access |
 | **Azure App Service** | Linux-based web application with managed identity |
+| **Private DNS Zones** | DNS resolution for App Service and Cosmos DB private endpoints |
 
 ## 📁 Project Structure
 
@@ -109,8 +119,9 @@ Manages compute resources:
 - **Linux Web App** with:
   - System-assigned managed identity
   - Client certificate authentication
-  - App Service to Cosmos DB connection
-- **Private DNS Zone** for web app private endpoints
+  - App Service to Cosmos DB connection via Service Connector
+- **Private DNS Zone** for web app (`privatelink.azurewebsites.net`) linked to Spoke 1 VNet
+- **Private DNS Zone** for Cosmos DB (`privatelink.documents.azure.com`) linked to Hub VNet
 
 ### Database Module (`modules/database/`)
 Manages database resources:
@@ -143,6 +154,8 @@ Manages security resources:
 |---------|----------------|
 | **Network Segmentation** | Hub-and-spoke topology with separate subnets for each tier |
 | **Private Endpoints** | Cosmos DB and App Service accessible only via private network |
+| **Private DNS Zones** | Automatic DNS resolution for private endpoints (App Service & Cosmos DB) |
+| **Private Link Service** | Enables secure access to Load Balancer via private endpoints |
 | **WAF Protection** | Application Gateway with WAF v2 and OWASP 3.2 rules |
 | **NSG Rules** | Granular inbound/outbound traffic control per subnet |
 | **Managed Identity** | System-assigned identities for secure service-to-service auth |
@@ -276,8 +289,11 @@ terraform destroy
 | Resource | Estimated Monthly Cost |
 |----------|----------------------|
 | Application Gateway (WAF_v2) | ~$250-500 |
+| Load Balancer (Standard) | ~$20-50 |
 | App Service (P1v2) | ~$80-150 |
 | Cosmos DB (Standard) | ~$25-100+ (based on RUs) |
+| Private Link Service | ~$10-30 |
+| Private DNS Zones | Minimal (~$0.50/zone) |
 | VNet/Subnets | Minimal (data transfer charges apply) |
 
 *Costs vary by region and usage. Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) for accurate estimates.*

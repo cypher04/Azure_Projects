@@ -183,11 +183,11 @@ This architecture implements a **Hub and Spoke network topology** on Microsoft A
 │  │  │                                                                          │    │    │
 │  │  └─────────────────────────────────────────────────────────────────────────┘    │    │
 │  │                                                                                  │    │
-│  │  ┌───────────────────────────────────────┐                                      │    │
-│  │  │     Private DNS Zone                  │                                      │    │
-│  │  │  privatelink.azurewebsites.net        │                                      │    │
-│  │  │  (Linked to Spoke 1 VNet)             │                                      │    │
-│  │  └───────────────────────────────────────┘                                      │    │
+│  │  ┌───────────────────────────────────────┐  ┌───────────────────────────────────┐  │    │
+│  │  │     Private DNS Zone (Web App)      │  │   Private DNS Zone (Cosmos DB)    │  │    │
+│  │  │  privatelink.azurewebsites.net      │  │  privatelink.documents.azure.com  │  │    │
+│  │  │  (Linked to Spoke 1 VNet)           │  │  (Linked to Hub VNet)             │  │    │
+│  │  └───────────────────────────────────────┘  └───────────────────────────────────┘  │    │
 │  │                                                                                  │    │
 │  └─────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                          │
@@ -258,11 +258,28 @@ This architecture implements a **Hub and Spoke network topology** on Microsoft A
 │  │  │  App Service Private Endpoint     │  │  Cosmos DB Private Endpoint       │   │    │
 │  │  │  (Spoke 2 - App Subnet)           │  │  (Hub - Database Subnet)          │   │    │
 │  │  │  Subresource: sites               │  │  Subresource: Sql                 │   │    │
+│  │  │  DNS Zone Group: app-dns-zone-    │  │  DNS Zone Group: cosmos-dns-      │   │    │
+│  │  │  group                            │  │  zone-group                       │   │    │
 │  │  └───────────────────────────────────┘  └───────────────────────────────────┘   │    │
 │  │                                                                                  │    │
 │  │  ┌───────────────────────────────────────────────────────────────────────────┐  │    │
 │  │  │            VNet Swift Connection (App Service Outbound)                    │  │    │
 │  │  │                    Connected to Delegation Subnet                          │  │    │
+│  │  └───────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                  │    │
+│  │  ┌───────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │                    Standard Load Balancer                                  │  │    │
+│  │  │                                                                            │  │    │
+│  │  │  • SKU: Standard                                                           │  │    │
+│  │  │  • Frontend IP: Public IP                                                  │  │    │
+│  │  └───────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                  │    │
+│  │  ┌───────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │                    Private Link Service                                    │  │    │
+│  │  │                                                                            │  │    │
+│  │  │  • NAT IP Configuration: Spoke 1 Web Subnet                               │  │    │
+│  │  │  • Linked to Load Balancer Frontend IP                                    │  │    │
+│  │  │  • Enables Private Endpoint connectivity                                  │  │    │
 │  │  └───────────────────────────────────────────────────────────────────────────┘  │    │
 │  │                                                                                  │    │
 │  └─────────────────────────────────────────────────────────────────────────────────┘    │
@@ -332,7 +349,8 @@ Hub VNet ◄────────────────► Spoke 2 VNet
 | App Service Plan | Hosting | Linux OS, P1v2 SKU |
 | Linux Web App | Application | Managed Identity, Client Certs |
 | Service Connector | Integration | Connects App to Cosmos DB |
-| Private DNS Zone | Name Resolution | privatelink.azurewebsites.net |
+| Private DNS Zone (Web App) | Name Resolution | privatelink.azurewebsites.net linked to Spoke 1 |
+| Private DNS Zone (Cosmos DB) | Name Resolution | privatelink.documents.azure.com linked to Hub |
 
 ### 3. Database Components
 
@@ -351,6 +369,16 @@ Hub VNet ◄────────────────► Spoke 2 VNet
 | NSG (Hub) | Database Security | HTTPS + SQL allowed, deny all |
 | NSG (Web) | Frontend Security | HTTPS from anywhere |
 | NSG (App) | Backend Security | SSH from web subnet only |
+
+### 5. Load Balancing & Private Link Components (Root Module)
+
+| Resource | Purpose | Key Configuration |
+|----------|---------|-------------------|
+| Standard Load Balancer | Traffic Distribution | Standard SKU, Public IP frontend |
+| Private Link Service | Private Access | NAT config on Spoke 1 Web Subnet |
+| App Service Private Endpoint | Private Inbound | Spoke 2 App Subnet, DNS Zone Group |
+| Cosmos DB Private Endpoint | Private DB Access | Hub Database Subnet, DNS Zone Group |
+| VNet Swift Connection | App Outbound | Delegation Subnet in Hub |
 
 ---
 
@@ -421,10 +449,13 @@ Layer 6: Data Protection
 **Resources defined in Terraform for data flow:**
 - `azurerm_application_gateway.appgw` - WAF_v2 with autoscale 2-5 instances
 - `azurerm_public_ip.public_ip` - Static Standard SKU
+- `azurerm_lb.loadbalancer` - Standard SKU Load Balancer
+- `azurerm_private_link_service.plservice` - Private Link Service for Load Balancer
 - `azurerm_private_endpoint.pe-appservice` - App Service private endpoint in Spoke 2
 - `azurerm_private_endpoint.pe-cosmosdb` - Cosmos DB private endpoint in Hub
 - `azurerm_app_service_virtual_network_swift_connection` - VNet integration for outbound
-- `azurerm_private_dns_zone.pdz` - `privatelink.azurewebsites.net` linked to Spoke 1
+- `azurerm_private_dns_zone.pdz-webapp` - `privatelink.azurewebsites.net` linked to Spoke 1
+- `azurerm_private_dns_zone.pdz-cosmosdb` - `privatelink.documents.azure.com` linked to Hub VNet
 
 ### Inbound Traffic Flow (User Request)
 
@@ -526,10 +557,14 @@ The infrastructure uses VNet Swift Connection to route App Service outbound traf
 
 **Resources defined in Terraform:**
 - `azurerm_app_service_virtual_network_swift_connection` - Connects App Service to delegation subnet
+- `azurerm_lb.loadbalancer` - Standard Load Balancer with Public IP frontend
+- `azurerm_private_link_service.plservice` - Private Link Service attached to Load Balancer
 - `azurerm_private_endpoint.pe-cosmosdb` - Private endpoint for Cosmos DB in Hub database subnet
 - `azurerm_private_endpoint.pe-appservice` - Private endpoint for App Service in Spoke 2 app subnet
-- `azurerm_private_dns_zone.pdz` - Private DNS Zone `privatelink.azurewebsites.net` (linked to Spoke 1 VNet)
+- `azurerm_private_dns_zone.pdz-webapp` - Private DNS Zone `privatelink.azurewebsites.net` (linked to Spoke 1 VNet)
+- `azurerm_private_dns_zone.pdz-cosmosdb` - Private DNS Zone `privatelink.documents.azure.com` (linked to Hub VNet)
 - `azurerm_app_service_connection` - Service Connector using System Assigned Managed Identity
+- Private DNS Zone Groups on both private endpoints for automatic DNS record creation
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -589,9 +624,9 @@ PATH 1: Application to Cosmos DB (Internal - Private Network)
 │  • 400 RU/s throughput          │
 └─────────────────────────────────┘
 
-⚠️  NOTE: No Private DNS Zone exists for Cosmos DB (privatelink.documents.azure.com).
-    DNS resolution for the Cosmos DB private endpoint may require manual configuration
-    or rely on Azure-provided DNS.
+✅  Private DNS Zone `privatelink.documents.azure.com` is configured and linked to Hub VNet.
+    DNS resolution uses `azurerm_private_dns_zone.pdz-cosmosdb` with automatic A record
+    creation via Private DNS Zone Group on the Cosmos DB private endpoint.
 
 ═══════════════════════════════════════════════════════════════════════════════════
 PATH 2: Response Flow (Database to User)
@@ -696,9 +731,12 @@ PATH 3: Application to External Services (Internet Egress)
 
 | Resource | Zone Name | Linked VNet | Purpose |
 |----------|-----------|-------------|---------|
-| `azurerm_private_dns_zone.pdz` | `privatelink.azurewebsites.net` | Spoke 1 VNet | App Service name resolution |
+| `azurerm_private_dns_zone.pdz-webapp` | `privatelink.azurewebsites.net` | Spoke 1 VNet | App Service name resolution |
+| `azurerm_private_dns_zone.pdz-cosmosdb` | `privatelink.documents.azure.com` | Hub VNet | Cosmos DB name resolution |
 
-**⚠️ Gap Identified:** No `privatelink.documents.azure.com` Private DNS Zone is defined for Cosmos DB private endpoint resolution.
+**Private DNS Zone Groups:**
+- App Service Private Endpoint → `app-dns-zone-group` → Links to `webapp_private_dns_zone_id`
+- Cosmos DB Private Endpoint → `cosmos-dns-zone-group` → Links to `cosmosdb_private_dns_zone_id`
 
 ### Outbound Traffic Security Controls (Implemented)
 
@@ -706,6 +744,9 @@ PATH 3: Application to External Services (Internet Egress)
 |-------|---------|-------------------|
 | **VNet Integration** | Delegation Subnet | `azurerm_app_service_virtual_network_swift_connection` |
 | **Private Endpoints** | Cosmos DB, App Service | `azurerm_private_endpoint.pe-cosmosdb`, `azurerm_private_endpoint.pe-appservice` |
+| **Private Link Service** | Load Balancer Access | `azurerm_private_link_service.plservice` |
+| **Private DNS Zones** | DNS Resolution | `azurerm_private_dns_zone.pdz-webapp`, `azurerm_private_dns_zone.pdz-cosmosdb` |
+| **DNS Zone Groups** | Automatic A Records | Configured on both private endpoints |
 | **Managed Identity** | SystemAssigned | `identity { type = "SystemAssigned" }` on Web App |
 | **Service Connector** | DB Authentication | `azurerm_app_service_connection` |
 | **NSG (Default)** | Outbound Allow | No explicit outbound deny rules defined |
@@ -714,18 +755,19 @@ PATH 3: Application to External Services (Internet Egress)
 
 | Destination | Connection Method | Terraform Resource |
 |-------------|-------------------|-------------------|
-| Cosmos DB | Private Endpoint (Hub VNet) | `azurerm_private_endpoint.pe-cosmosdb` |
+| Cosmos DB | Private Endpoint via Private Link Service | `azurerm_private_endpoint.pe-cosmosdb` |
+| Load Balancer | Private Link Service | `azurerm_private_link_service.plservice` |
 | Internet | Default Azure SNAT | VNet Swift Connection → Azure SNAT |
 
 ### Infrastructure Gaps (Not in Terraform)
 
 The following are **NOT** currently defined in the Terraform configuration:
 
-1. **Private DNS Zone for Cosmos DB** (`privatelink.documents.azure.com`)
-2. **NAT Gateway** - No predictable outbound IP for internet egress
-3. **Azure Firewall** - No central egress filtering
-4. **Service Endpoints** - Not configured for any Azure services
-5. **User Defined Routes (UDR)** - No custom routing tables
+1. **NAT Gateway** - No predictable outbound IP for internet egress
+2. **Azure Firewall** - No central egress filtering
+3. **Service Endpoints** - Not configured for any Azure services
+4. **User Defined Routes (UDR)** - No custom routing tables
+5. **WAF Policy Association** - WAF policy exists but is not associated with Application Gateway
 
 ---
 

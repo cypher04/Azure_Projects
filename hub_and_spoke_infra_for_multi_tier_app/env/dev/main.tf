@@ -78,16 +78,16 @@ resource "azurerm_app_service_virtual_network_swift_connection" "vnet_connection
 
 // create load balancer
 
-resource "azurerm_lb" "loadbalancer" {
-  name                = "${var.project_name}-lb-${var.environment}"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg-main.name
-  sku                 = "Standard"
-  frontend_ip_configuration {
-    name                 = "LoadBalancerFrontEnd"
-    public_ip_address_id = module.networking.public_ip_id
-  }
-}
+# resource "azurerm_lb" "loadbalancer" {
+#   name                = "${var.project_name}-lb-${var.environment}"
+#   location            = var.location
+#   resource_group_name = azurerm_resource_group.rg-main.name
+#   sku                 = "Standard"
+#   frontend_ip_configuration {
+#     name                 = "LoadBalancerFrontEnd"
+#     public_ip_address_id = module.networking.public_ip_id
+#   }
+# }
 
 
 // create private link service for load balancer
@@ -104,7 +104,6 @@ resource "azurerm_private_link_service" "plservice" {
 
 
   load_balancer_frontend_ip_configuration_ids = [
-    azurerm_lb.loadbalancer.frontend_ip_configuration[0].id
   ]
   
 }

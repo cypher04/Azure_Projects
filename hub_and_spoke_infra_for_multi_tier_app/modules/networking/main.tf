@@ -89,7 +89,20 @@ resource "azurerm_virtual_network_peering" "spoke2-to-hub" {
     remote_virtual_network_id = azurerm_virtual_network.vnet-hub.id
 }
 
+resource "azurerm_virtual_network_peering" "spoke1-to-spoke2-peering" {
+    name                      = "${var.project_name}-spoke1-to-spoke2-peering-${var.environment}"
+    resource_group_name       = var.resource_group
+    virtual_network_name      = azurerm_virtual_network.vnet-spoke-1.name
+    remote_virtual_network_id = azurerm_virtual_network.vnet-spoke-2.id
+}
 
+
+resource "azurerm_virtual_network_peering" "spoke2-to-spoke1-peering" {
+    name                      = "${var.project_name}-spoke2-to-spoke1-peering-${var.environment}"
+    resource_group_name       = var.resource_group
+    virtual_network_name      = azurerm_virtual_network.vnet-spoke-2.name
+    remote_virtual_network_id = azurerm_virtual_network.vnet-spoke-1.id
+}
 
 // Create a Public IP for the App Service Environment
 resource "azurerm_public_ip" "public_ip" {
