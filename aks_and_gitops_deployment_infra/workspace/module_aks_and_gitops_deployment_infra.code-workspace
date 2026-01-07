@@ -1,0 +1,9 @@
+{
+	"folders": [
+		{
+			"name": "aks_and_gitops_deployment_infra",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
