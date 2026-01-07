@@ -41,3 +41,11 @@ output "public_ip_id" {
     value = azurerm_public_ip.public_ip.id
 }
 
+output "hub_subnet_id" {
+    value = azurerm_subnet.hub-subnet-database.id
+}
+
+output "vnet_hub_id" {
+    value = azurerm_virtual_network.vnet-hub.id
+}
+

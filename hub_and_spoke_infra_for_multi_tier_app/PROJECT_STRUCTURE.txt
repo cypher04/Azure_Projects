@@ -1,55 +1,233 @@
-web_app_with_database_infra/
-├── .gitignore
-├── README.md
-├── ARCHITECTURE.md
-├── PROJECT_STRUCTURE.txt
+================================================================================
+         HUB AND SPOKE INFRASTRUCTURE FOR MULTI-TIER APPLICATION
+                        PROJECT STRUCTURE
+================================================================================
+
+hub_and_spoke_infra_for_multi_tier_app/
 │
-├── env/
-│   ├── dev/
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   ├── outputs.tf
-│   │   ├── providers.tf
-│   │   ├── backend.tf
-│   │   └── terraform.tfvars
-│   │
-│   ├── stage/
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   ├── outputs.tf
-│   │   ├── providers.tf
-│   │   ├── backend.tf
-│   │   └── terraform.tfvars
-│   │
-│   └── prod/
-│       ├── main.tf
-│       ├── variables.tf
-│       ├── outputs.tf
-│       ├── providers.tf
-│       ├── backend.tf
-│       └── terraform.tfvars
+├── README.md                         # Main project documentation
+├── ARCHITECTURE.md                   # Detailed architecture documentation
+├── PROJECT_STRUCTURE.txt             # This file - project structure overview
+├── create_structure.sh               # Script to create initial folder structure
 │
-└── modules/
-    ├── compute/
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   ├── output.tf
-    │   └── README.md
+├── workspace/                        # VS Code workspace configurations
+│   ├── AZURE_PROJECTS_hub_and_spoke_multi_tier.code-workspace
+│   ├── module_AZURE_PROJECTS_hub_and_spoke_multi_tier.code-workspace
+│   └── Root_AZURE_PROJECTS.code-workspace
+│
+├── env/                              # Environment-specific configurations
+│   │
+│   ├── dev/                          # DEVELOPMENT ENVIRONMENT
+│   │   ├── main.tf                   # Main config - resource group & module calls
+│   │   │                             #   - azurerm_resource_group
+│   │   │                             #   - module.compute
+│   │   │                             #   - module.networking
+│   │   │                             #   - module.database
+│   │   │                             #   - module.security
+│   │   │                             #   - Private endpoints (App Service, Cosmos DB)
+│   │   │                             #   - VNet Swift connection
+│   │   ├── variables.tf              # Variable definitions for dev
+│   │   ├── outputs.tf                # Output values (NSG ID, Public IP, DB ID, etc.)
+│   │   ├── providers.tf              # Azure provider configuration (v3.0+)
+│   │   ├── backend.tf                # Remote state backend configuration
+│   │   ├── terraform.tfvars          # Variable values for development
+│   │   └── terraform.tfstate         # Local state file (if no remote backend)
+│   │
+│   ├── stage/                        # STAGING ENVIRONMENT
+│   │   ├── main.tf                   # Main configuration for staging
+│   │   ├── variables.tf              # Variable definitions
+│   │   ├── outputs.tf                # Output definitions
+│   │   ├── providers.tf              # Provider configuration
+│   │   ├── backend.tf                # Backend configuration
+│   │   └── terraform.tfvars          # Variable values for staging
+│   │
+│   └── prod/                         # PRODUCTION ENVIRONMENT
+│       ├── main.tf                   # Main configuration for production
+│       ├── variables.tf              # Variable definitions
+│       ├── outputs.tf                # Output definitions
+│       ├── providers.tf              # Provider configuration
+│       ├── backend.tf                # Backend configuration
+│       └── terraform.tfvars          # Variable values for production
+│
+└── modules/                          # REUSABLE TERRAFORM MODULES
     │
-    ├── database/
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   ├── outputs.tf
-    │   └── README.md
+    ├── compute/                      # COMPUTE MODULE
+    │   ├── main.tf                   # Compute resources:
+    │   │                             #   - azurerm_service_plan (Linux, P1v2)
+    │   │                             #   - azurerm_linux_web_app (with managed identity)
+    │   │                             #   - azurerm_app_service_connection (to Cosmos DB)
+    │   │                             #   - azurerm_private_dns_zone
+    │   │                             #   - azurerm_private_dns_zone_virtual_network_link
+    │   ├── variables.tf              # Input variables
+    │   ├── output.tf                 # Outputs: linux_web_app_id
+    │   └── README.md                 # Module documentation
     │
-    ├── networking/
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   ├── outputs.tf
-    │   └── README.md
+    ├── database/                     # DATABASE MODULE
+    │   ├── main.tf                   # Database resources:
+    │   │                             #   - azurerm_cosmosdb_account (GlobalDocumentDB)
+    │   │                             #   - azurerm_cosmosdb_sql_database
+    │   │                             #   - azurerm_cosmosdb_sql_container
+    │   ├── variables.tf              # Input variables
+    │   ├── outputs.tf                # Outputs: account_id, database_id, container_id, endpoint
+    │   └── README.md                 # Module documentation
     │
-    └── security/
-        ├── main.tf
-        ├── variables.tf
-        ├── outputs.tf
-        └── README.md
+    ├── networking/                   # NETWORKING MODULE
+    │   ├── main.tf                   # Network resources:
+    │   │                             #   - azurerm_virtual_network (Hub VNet)
+    │   │                             #   - azurerm_virtual_network (Spoke 1 VNet)
+    │   │                             #   - azurerm_virtual_network (Spoke 2 VNet)
+    │   │                             #   - azurerm_subnet (Hub database subnet)
+    │   │                             #   - azurerm_subnet (Hub delegation subnet)
+    │   │                             #   - azurerm_subnet (Spoke 1 web subnet)
+    │   │                             #   - azurerm_subnet (Spoke 2 app subnet)
+    │   │                             #   - azurerm_virtual_network_peering (4 peerings)
+    │   │                             #   - azurerm_public_ip
+    │   ├── variables.tf              # Input variables
+    │   ├── outputs.tf                # Outputs: VNet IDs, subnet IDs, peering IDs, public IP
+    │   └── README.md                 # Module documentation
+    │
+    └── security/                     # SECURITY MODULE
+        ├── main.tf                   # Security resources:
+        │                             #   - azurerm_network_security_group (Hub NSG)
+        │                             #   - azurerm_network_security_group (Web NSG)
+        │                             #   - azurerm_network_security_group (App NSG)
+        │                             #   - azurerm_network_security_rule (HTTPS, SSH, SQL, Deny)
+        │                             #   - azurerm_subnet_network_security_group_association (3x)
+        │                             #   - azurerm_application_gateway (WAF_v2)
+        │                             #   - azurerm_web_application_firewall_policy (OWASP 3.2)
+        ├── variables.tf              # Input variables
+        ├── outputs.tf                # Outputs: network_security_group_id
+        └── README.md                 # Module documentation
+
+
+================================================================================
+                           MODULE DEPENDENCIES
+================================================================================
+
+                    ┌─────────────────────────────────┐
+                    │           main.tf               │
+                    │     (Environment Root)          │
+                    └─────────────────────────────────┘
+                                   │
+            ┌──────────────────────┼──────────────────────┐
+            │                      │                      │
+            ▼                      ▼                      ▼
+    ┌───────────────┐      ┌───────────────┐      ┌───────────────┐
+    │  networking   │      │   database    │      │    compute    │
+    │    module     │      │    module     │      │    module     │
+    └───────┬───────┘      └───────────────┘      └───────┬───────┘
+            │                                              │
+            │              ┌───────────────┐               │
+            └─────────────►│   security    │◄──────────────┘
+                           │    module     │
+                           └───────────────┘
+
+================================================================================
+                              FILE DESCRIPTIONS
+================================================================================
+
+ENVIRONMENT FILES (env/*/):
+─────────────────────────────────────────────────────────────────────────────────
+main.tf          : Root module that creates resource group and calls all modules.
+                   Also creates private endpoints and VNet integration at root
+                   level to avoid circular dependencies between modules.
+
+variables.tf     : Defines all input variables required for the environment:
+                   resource_group, location, project_name, environment,
+                   address_space, subnet_prefixes, delegation_subnet, etc.
+
+outputs.tf       : Exposes key resource IDs and properties after deployment:
+                   NSG ID, Public IP, Database ID, Resource Group details.
+
+providers.tf     : Configures the Azure provider (azurerm ~> 3.0) with
+                   required features block.
+
+backend.tf       : Configures remote state storage (Azure Storage, S3, etc.)
+                   for team collaboration and state locking.
+
+terraform.tfvars : Environment-specific variable values. Contains sensitive
+                   configuration like network CIDRs and project identifiers.
+
+================================================================================
+                           NETWORK TOPOLOGY
+================================================================================
+
+Address Space Allocation (Development Environment):
+─────────────────────────────────────────────────────────────────────────────────
+VNet Address Space  : 10.0.1.0/24
+Database Subnet     : 10.0.1.0/24  (Hub - Cosmos DB Private Endpoint)
+Web Subnet          : 10.0.2.0/24  (Spoke 1 - Web tier)
+App Subnet          : 10.0.3.0/24  (Spoke 2 - App tier, App Service PE)
+Delegation Subnet   : 10.0.4.0/24  (Hub - Container Groups delegation)
+
+================================================================================
+                        RESOURCE NAMING CONVENTION
+================================================================================
+
+Pattern: {project_name}-{resource_type}-{environment}
+
+Examples:
+─────────────────────────────────────────────────────────────────────────────────
+Resource Group      : rg-hub_and_spoke_infra_for_multi_tier_app-dev
+Virtual Network     : hub_and_spoke_infra_for_multi_tier_app-dev-vnet
+Subnet              : hub_and_spoke_infra_for_multi_tier_app-dev-subnet-database
+App Service Plan    : hub_and_spoke_infra_for_multi_tier_app-serviceplan-dev
+Web App             : hub-and-spoke-infra-for-multi-tier-app-webapp-dev
+Cosmos DB           : hub-and-spoke-infra-for-multi-tier-app-cosmos-dev
+Application Gateway : hub_and_spoke_infra_for_multi_tier_app-appgw-dev
+NSG                 : hub_and_spoke_infra_for_multi_tier_app-nsg-dev
+
+================================================================================
+                          TERRAFORM COMMANDS
+================================================================================
+
+# Initialize the working directory
+terraform init
+
+# Validate the configuration
+terraform validate
+
+# Preview changes
+terraform plan
+
+# Apply changes
+terraform apply
+
+# Destroy infrastructure
+terraform destroy
+
+# Format code
+terraform fmt -recursive
+
+# Generate documentation
+terraform-docs markdown . > README.md
+
+================================================================================
+                           DEPLOYMENT ORDER
+================================================================================
+
+1. Resource Group    (created in main.tf)
+2. Networking Module (VNets, Subnets, Peering, Public IP)
+3. Database Module   (Cosmos DB Account, Database, Container)
+4. Compute Module    (App Service Plan, Web App, DNS Zone)
+5. Security Module   (NSGs, Rules, Associations, App Gateway, WAF)
+6. Private Endpoints (App Service PE, Cosmos DB PE - in main.tf)
+7. VNet Integration  (Swift Connection - in main.tf)
+
+================================================================================
+                          KEY OUTPUTS
+================================================================================
+
+After successful deployment, the following outputs are available:
+
+Output                      Description
+─────────────────────────────────────────────────────────────────────────────────
+resource_group_name         Name of the Azure Resource Group
+location                    Azure region of deployment
+network_security_group_id   ID of the Hub NSG
+public_ip_id                ID of the Application Gateway Public IP
+sql_database_id             ID of the Cosmos DB SQL Database
+project_name                Project identifier
+environment                 Deployed environment (dev/stage/prod)
+
+================================================================================

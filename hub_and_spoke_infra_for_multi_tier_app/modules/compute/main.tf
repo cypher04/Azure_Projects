@@ -42,8 +42,8 @@ site_config {
     }
 }
 
-
-resource "azurerm_private_dns_zone" "pdz" {
+// private dns zone for web app
+resource "azurerm_private_dns_zone" "pdz-webapp" {
     name                = "privatelink.azurewebsites.net"
     resource_group_name = var.resource_group
 }
@@ -51,21 +51,26 @@ resource "azurerm_private_dns_zone" "pdz" {
 resource "azurerm_private_dns_zone_virtual_network_link" "pdz_vnet_link" {
     name                  = "${var.project_name}-pdz-vnet-link-${var.environment}"
     resource_group_name   = var.resource_group
-    private_dns_zone_name = azurerm_private_dns_zone.pdz.name
+    private_dns_zone_name = azurerm_private_dns_zone.pdz-webapp.name
     virtual_network_id    = var.vnet_spoke_1_id
     registration_enabled  = false
 }
 
-# resource "azurerm_dns_zone_group" "name" {
-#     name                 = "${var.project_name}-dzg-${var.environment}"
-#     private_endpoint_id  = azurerm_private_endpoint.pe-appservice.id
 
-#     private_dns_zone_config {
-#         name                  = "pdz-config"
-#         private_dns_zone_id   = azurerm_private_dns_zone.pdz.id
-#     }
-# }
+// private dns zone for cosmosdb
+resource "azurerm_private_dns_zone" "pdz-cosmosdb" {
+    name                = "privatelink.documents.azure.com"
+    resource_group_name = var.resource_group
+}
 
+
+resource "azurerm_private_dns_zone_virtual_network_link" "pdz_vnet_link_db" {
+    name                  = "${var.project_name}-pdz-vnet-link-db-${var.environment}"
+    resource_group_name   = var.resource_group
+    private_dns_zone_name = azurerm_private_dns_zone.pdz-cosmosdb.name
+    virtual_network_id    = var.vnet_hub_id
+    registration_enabled  = false
+}
 
 
 

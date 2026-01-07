@@ -29,26 +29,25 @@ variable "subnet_ids" {
     type        = list(string)
 }
 
-variable "delegation_subnet" {
-    description = "The delegation for the subnet"
-    type        = list(string)
-}
+
 
 
 variable "vnet_spoke_1_id" {
     description = "The ID of the Spoke 1 Virtual Network"
     type        = string
-    default     = ""
 }
 
 variable "cosmosdb_id" {
     description = "The ID of the Cosmos DB account"
     type        = string
-    default     = ""
 }
 
 variable "delegation_subnet_id" {
     description = "The ID of the delegation subnet for VNet integration"
     type        = string
-    default     = ""
+}
+
+variable "vnet_hub_id" {
+    description = "The ID of the Hub Virtual Network"
+    type        = string
 }

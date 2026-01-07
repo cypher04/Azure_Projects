@@ -61,3 +61,14 @@ variable "vnet_spoke_1_id" {
     default     = ""
 }
 
+variable "vnet_hub_id" {
+    description = "The ID of the Hub Virtual Network"
+    type        = string
+    default     = ""
+}
+
+variable "hub_subnet_id" {
+    description = "The ID of the Hub Subnet"
+    type        = string
+    default     = ""
+}
