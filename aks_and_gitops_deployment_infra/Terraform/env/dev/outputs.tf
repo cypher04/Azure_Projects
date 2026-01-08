@@ -1,3 +1,3 @@
 output "app_url" {
-    value = var.aca_name
+    value = module.compute.app_url
 }
