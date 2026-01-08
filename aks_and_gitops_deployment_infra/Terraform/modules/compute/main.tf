@@ -5,15 +5,15 @@ resource "azurerm_container_registry" "acr" {
     sku                 = "Basic"
     admin_enabled       = true
 
-    georeplications {
-      location = "West Europe"
-      zone_redundancy_enabled = true
-    }
+            # georeplications {
+            #   location = "West Europe"
+            #   zone_redundancy_enabled = true
+            # }
 
-    georeplications {
-      location = "North Europe"
-      zone_redundancy_enabled = true
-    }
+            # georeplications {
+            #   location = "North Europe"
+            #   zone_redundancy_enabled = true
+            #}
 }
 
 
@@ -36,16 +36,24 @@ resource "azurerm_container_app_environment" "aca-env" {
     
 }
 
-
+resource "azurerm_role_assignment" "acr_role_assignment" {
+  scope                = azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_container_app.aca.identity[0].principal_id
+}
 
 
 
 
 resource "azurerm_container_app" "aca" {
-    name = "${var.acr_name}-aca"
+    name = "${var.aca_name}-aca"
     container_app_environment_id = azurerm_container_app_environment.aca-env.id
     resource_group_name = var.resource_group_name
-    revision_mode = "single"
+    revision_mode = "Single"
+
+    identity {
+        type = "SystemAssigned"
+    }
 
 
     registry {

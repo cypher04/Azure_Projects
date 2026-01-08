@@ -11,23 +11,7 @@ variable "location" {
 variable "resource_group_name" {
     description = "The name of the resource group in which to create the Azure Container Registry."
     type        = string
-}
-
-variable "dns_prefix" {
-    description = "The DNS prefix for the Azure Container Registry."
-    type        = string
-}
-
-variable "node_count" {
-    description = "The number of nodes in the default node pool."
-    type        = number
-    default     = 3
 }   
-
-variable "vm_size" {
-    description = "The size of the Virtual Machines in the default node pool."
-    type        = string
-}
 
 variable "image" {
     description = "The container image to deploy in the Container App."
@@ -39,3 +23,7 @@ variable "del_sub_id" {
     type        = string
 }   
 
+variable "aca_name" {
+    description = "The name of the Azure Container App."
+    type        = string
+}

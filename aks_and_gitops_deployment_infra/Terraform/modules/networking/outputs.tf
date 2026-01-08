@@ -1,5 +1,5 @@
 output "del_sub_id" {
-  value = azurerm_subnet.app.id
+  value = azurerm_subnet.del_sub.id
 }
 
 output "acr_sub_id" {
