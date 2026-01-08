@@ -5,3 +5,7 @@ output "acr_id" {
 output "aca_name" {
     value = azurerm_container_app.aca.name
 }
+
+output "app_url" {
+    value = azurerm_container_app.aca.latest_revision_fqdn
+}
