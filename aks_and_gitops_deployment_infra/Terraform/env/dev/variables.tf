@@ -7,7 +7,6 @@ variable "location" {
 variable "environment" {
     description = "The deployment environment (e.g., dev, prod)."
     type        = string
-    default     = "dev"
 }
 
 variable "project_name" {
@@ -39,21 +38,38 @@ variable "acr_name" {
     type        = string
 }
 
-variable "vnet_id" {
-    description = "The ID of the virtual network."
-    type        = string
-}
+# variable "vnet_id" {
+#     description = "The ID of the virtual network."
+#     type        = string
+#     default = ""
+# }
 
-variable "acr_subnet_id" {
-    description = "The ID of the subnet for the Azure Container Registry."
-    type        = string
-}
+# variable "acr_subnet_id" {
+#     description = "The ID of the subnet for the Azure Container Registry."
+#     type        = string
+#     default = ""
+# }
 
-variable "acr_id" {
-    description = "The ID of the Azure Container Registry."
-    type        = string
-}
+# variable "acr_id" {
+#     description = "The ID of the Azure Container Registry."
+#     type        = string
+#     default = ""
+# }
   
+variable "image_name" {
+    description = "The name of the container image to deploy."
+    type        = string
+}
 
+# variable "del_sub_id" {
+#     description = "The ID of the subnet for the delivery service."
+#     type        = string
+#     default = ""
+# }
+
+variable "aca_name" {
+    description = "The name of the Azure Container App."
+    type        = string
+}
 
 
