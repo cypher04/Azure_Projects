@@ -1,5 +1,5 @@
 resource "azurerm_resource_group" "rg-main" {
-  name     = "rg-${var.project_name}-${var.environment}"
+  name     = var.resource_group_name
   location = var.location
 }
 
@@ -50,7 +50,7 @@ module "networking" {
 
 
 resource "azurerm_private_dns_zone" "acr_pdz" {
-    name                = "privatelink.azurewebsites.net"
+    name                = "privatelink.azurecr.io"
     resource_group_name = var.resource_group_name
 }
 
@@ -73,7 +73,7 @@ resource "azurerm_private_endpoint" "acr_private_endpoint" {
     name                           = "${var.project_name}-psc-acr-${var.environment}"
     private_connection_resource_id = module.compute.acr_id
     is_manual_connection           = false
-    subresource_names              = ["sites"]
+    subresource_names              = ["registry"]
   }
 
   private_dns_zone_group {

@@ -2,7 +2,7 @@ resource "azurerm_container_registry" "acr" {
     name                = "${var.acr_name}acr"
     location            = var.location
     resource_group_name = var.resource_group_name
-    sku                 = "Basic"
+    sku                 = "Premium"
     admin_enabled       = true
 
             # georeplications {
@@ -33,7 +33,7 @@ resource "azurerm_container_app_environment" "aca-env" {
     resource_group_name = var.resource_group_name
     log_analytics_workspace_id = azurerm_log_analytics_workspace.law.id
     infrastructure_subnet_id = var.del_sub_id
-    
+    internal_load_balancer_enabled = false
 }
 
 resource "azurerm_role_assignment" "acr_role_assignment" {
@@ -57,15 +57,32 @@ resource "azurerm_container_app" "aca" {
 
 
     registry {
-        server   = azurerm_container_registry.acr.login_server
-        identity = "SystemAssigned"
+        server               = azurerm_container_registry.acr.login_server
+        username             = azurerm_container_registry.acr.admin_username
+        password_secret_name = "acr-password"
+    }
+
+    secret {
+        name  = "acr-password"
+        value = azurerm_container_registry.acr.admin_password
+    }
+
+    ingress {
+        external_enabled = true
+        target_port       = 3000
+        transport         = "auto"
+
+        traffic_weight {
+            percentage      = 100
+            latest_revision = true
+        }
     }
 
     template {
       container {
         name = "app"
         image = var.image
-        cpu = 0.25
+        cpu = 0.5
         memory = "1Gi"
       }
     }

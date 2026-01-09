@@ -17,19 +17,6 @@ resource "azurerm_subnet" "del_sub" {
     resource_group_name  = var.resource_group_name
     virtual_network_name = azurerm_virtual_network.vnet.name
     address_prefixes     = [var.subnet_prefixes["del_sub"]]
-
-
-    delegation {
-        name = "cont_app_delegation"
-
-        service_delegation {
-            name = "Microsoft.ContainerService/managedClusters"
-            actions = [
-                "Microsoft.Network/virtualNetworks/subnets/join/action",
-                "Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action",
-            ]
-        }
-    }
 }
 
 
