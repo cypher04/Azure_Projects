@@ -5,13 +5,15 @@ resource "azurerm_container_registry" "acr" {
     sku                 = "Premium"
     admin_enabled       = true
 
+    public_network_access_enabled = false # Sensitive data, disable public network access
+
             # georeplications {
             #   location = "West Europe"
             #   zone_redundancy_enabled = true
             # }
 
             # georeplications {
-            #   location = "North Europe"
+            #   location = "North Europe"   
             #   zone_redundancy_enabled = true
             #}
 }

@@ -49,6 +49,8 @@ module "networking" {
 
 
 
+// Create Private DNS Zone for ACR
+
 resource "azurerm_private_dns_zone" "acr_pdz" {
     name                = "privatelink.azurecr.io"
     resource_group_name = var.resource_group_name
