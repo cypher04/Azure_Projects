@@ -3,7 +3,7 @@ resource "azurerm_container_registry" "acr" {
     location            = var.location
     resource_group_name = var.resource_group_name
     sku                 = "Premium"
-    admin_enabled       = false
+    admin_enabled       = true
 
     public_network_access_enabled = false # Sensitive data, disable public network access
 
