@@ -7,6 +7,11 @@ resource "azurerm_container_registry" "acr" {
 
     public_network_access_enabled = false # Sensitive data, disable public network access
 
+
+    identity {
+        type = "SystemAssigned"
+    }
+
             # georeplications {
             #   location = "West Europe"
             #   zone_redundancy_enabled = true
