@@ -1,0 +1,219 @@
+# GitLab CI/CD Pipeline for Infrastructure Deployment (Terraform)
+# This pipeline provisions Azure infrastructure: ACR, VNet, Container App Environment, etc.
+# Targets: container_app_deployment_project folder
+
+stages:
+  - validate
+  - plan
+  - apply
+  - destroy
+
+variables:
+  TERRAFORM_VERSION: "1.6.0"
+  TF_ROOT: "${CI_PROJECT_DIR}/container_app_deployment_project/Terraform"
+  # Backend configuration - set these in GitLab CI/CD Variables
+  TF_BACKEND_RESOURCE_GROUP: "rg-terraform-state"
+  TF_BACKEND_STORAGE_ACCOUNT: "stterraformstate"
+  TF_BACKEND_CONTAINER: "tfstate"
+  # Azure credentials - set these in GitLab CI/CD Variables (masked/protected)
+  # ARM_CLIENT_ID: <from CI/CD variables>
+  # ARM_CLIENT_SECRET: <from CI/CD variables>
+  # ARM_SUBSCRIPTION_ID: <from CI/CD variables>
+  # ARM_TENANT_ID: <from CI/CD variables>
+
+# Reusable configuration
+.terraform_base:
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y curl unzip
+    - curl -fsSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip
+    - unzip -o terraform.zip && mv terraform /usr/local/bin/
+    - terraform version
+    - curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+    - az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - ${TF_ROOT}/env/dev/.terraform
+      - ${TF_ROOT}/env/prod/.terraform
+
+# Only run on Terraform changes
+.terraform_rules:
+  rules:
+    - changes:
+        - container_app_deployment_project/Terraform/modules/**/*
+        - container_app_deployment_project/Terraform/env/**/*
+      when: on_success
+    - when: never
+
+# ==================== VALIDATE STAGE ====================
+
+validate:format:
+  extends: .terraform_base
+  stage: validate
+  script:
+    - cd ${TF_ROOT}
+    - terraform fmt -check -recursive
+  allow_failure: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+
+validate:dev:
+  extends: .terraform_base
+  stage: validate
+  script:
+    - cd ${TF_ROOT}/env/dev
+    - terraform init -backend=false
+    - terraform validate
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+
+validate:prod:
+  extends: .terraform_base
+  stage: validate
+  script:
+    - cd ${TF_ROOT}/env/prod
+    - terraform init -backend=false
+    - terraform validate
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ==================== PLAN STAGE ====================
+
+plan:dev:
+  extends: .terraform_base
+  stage: plan
+  script:
+    - cd ${TF_ROOT}/env/dev
+    - |
+      terraform init \
+        -backend-config="resource_group_name=${TF_BACKEND_RESOURCE_GROUP}" \
+        -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+        -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+        -backend-config="key=dev.terraform.tfstate"
+    - terraform plan -out=tfplan -input=false -var-file=terraform.tfvars
+  artifacts:
+    paths:
+      - ${TF_ROOT}/env/dev/tfplan
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+plan:prod:
+  extends: .terraform_base
+  stage: plan
+  script:
+    - cd ${TF_ROOT}/env/prod
+    - |
+      terraform init \
+        -backend-config="resource_group_name=${TF_BACKEND_RESOURCE_GROUP}" \
+        -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+        -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+        -backend-config="key=prod.terraform.tfstate"
+    - terraform plan -out=tfplan -input=false -var-file=terraform.tfvars
+  artifacts:
+    paths:
+      - ${TF_ROOT}/env/prod/tfplan
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ==================== APPLY STAGE ====================
+
+apply:dev:
+  extends: .terraform_base
+  stage: apply
+  script:
+    - cd ${TF_ROOT}/env/dev
+    - |
+      terraform init \
+        -backend-config="resource_group_name=${TF_BACKEND_RESOURCE_GROUP}" \
+        -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+        -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+        -backend-config="key=dev.terraform.tfstate"
+    - terraform apply -auto-approve -input=false tfplan
+    - echo "=== Outputs ===" && terraform output -json
+  dependencies:
+    - plan:dev
+  environment:
+    name: dev
+    url: https://dev.example.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+  needs:
+    - job: plan:dev
+      artifacts: true
+
+apply:prod:
+  extends: .terraform_base
+  stage: apply
+  script:
+    - cd ${TF_ROOT}/env/prod
+    - |
+      terraform init \
+        -backend-config="resource_group_name=${TF_BACKEND_RESOURCE_GROUP}" \
+        -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+        -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+        -backend-config="key=prod.terraform.tfstate"
+    - terraform apply -auto-approve -input=false tfplan
+    - echo "=== Outputs ===" && terraform output -json
+  dependencies:
+    - plan:prod
+  environment:
+    name: production
+    url: https://prod.example.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  needs:
+    - job: plan:prod
+      artifacts: true
+
+# ==================== DESTROY STAGE ====================
+
+destroy:dev:
+  extends: .terraform_base
+  stage: destroy
+  script:
+    - cd ${TF_ROOT}/env/dev
+    - |
+      terraform init \
+        -backend-config="resource_group_name=${TF_BACKEND_RESOURCE_GROUP}" \
+        -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+        -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+        -backend-config="key=dev.terraform.tfstate"
+      echo "WARNING: Destroying Dev Infrastructure!"
+      terraform destroy -auto-approve -var-file=terraform.tfvars
+  environment:
+    name: dev
+    action: stop
+  rules:
+    - if: '$DESTROY_ENVIRONMENT == "dev"'
+      when: manual
+  allow_failure: false
+
+destroy:prod:
+  extends: .terraform_base
+  stage: destroy
+  script:
+    - cd ${TF_ROOT}/env/prod
+    - |
+      terraform init \
+        -backend-config="resource_group_name=${TF_BACKEND_RESOURCE_GROUP}" \
+        -backend-config="storage_account_name=${TF_BACKEND_STORAGE_ACCOUNT}" \
+        -backend-config="container_name=${TF_BACKEND_CONTAINER}" \
+        -backend-config="key=prod.terraform.tfstate"
+      echo "WARNING: Destroying Production Infrastructure!"
+      terraform destroy -auto-approve -var-file=terraform.tfvars
+  environment:
+    name: production
+    action: stop
+  rules:
+    - if: '$DESTROY_ENVIRONMENT == "prod"'
+      when: manual
+  allow_failure: false

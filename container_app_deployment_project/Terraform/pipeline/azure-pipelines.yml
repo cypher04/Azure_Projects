@@ -1,0 +1,232 @@
+# Azure DevOps Pipeline for Container App Deployment
+# This pipeline builds the Docker image, pushes to ACR, and deploys to Container App
+# Targets: container_app_deployment_project folder
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - container_app_deployment_project/App/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - container_app_deployment_project/App/**
+
+variables:
+  # Azure subscription service connection name (configure in Azure DevOps)
+  azureServiceConnection: 'azure-service-connection'
+  
+  # Project folder (change this to target a different project)
+  projectFolder: 'container_app_deployment_project'
+  
+  # Resource group and location
+  resourceGroupName: 'rg-myproject-dev'
+  location: 'eastus'
+  
+  # Container Registry
+  acrName: 'myprojectdevacracr'
+  acrLoginServer: '$(acrName).azurecr.io'
+  
+  # Container App
+  containerAppName: 'myprojectdevaca-aca'
+  containerAppEnvName: 'myprojectdevacr-aca-env'
+  
+  # Image configuration
+  imageName: 'app-server'
+  imageTag: '$(Build.BuildId)'
+  
+  # Dockerfile path
+  dockerfilePath: '$(Build.SourcesDirectory)/$(projectFolder)/App/Dockerfile'
+  dockerBuildContext: '$(Build.SourcesDirectory)/$(projectFolder)/App'
+
+stages:
+  # ============================================
+  # Stage 1: Build and Push Docker Image
+  # ============================================
+  - stage: Build
+    displayName: 'Build and Push Image'
+    jobs:
+      - job: BuildAndPush
+        displayName: 'Build and Push Docker Image'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: AzureCLI@2
+            displayName: 'Login to Azure Container Registry'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr login --name $(acrName)
+
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              containerRegistry: $(azureServiceConnection)
+              repository: $(imageName)
+              command: 'build'
+              Dockerfile: $(dockerfilePath)
+              buildContext: $(dockerBuildContext)
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: AzureCLI@2
+            displayName: 'Push Image to ACR'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Tag and push with build number
+                docker tag $(imageName):$(imageTag) $(acrLoginServer)/$(imageName):$(imageTag)
+                docker push $(acrLoginServer)/$(imageName):$(imageTag)
+                
+                # Tag and push as latest
+                docker tag $(imageName):$(imageTag) $(acrLoginServer)/$(imageName):latest
+                docker push $(acrLoginServer)/$(imageName):latest
+                
+                echo "Image pushed: $(acrLoginServer)/$(imageName):$(imageTag)"
+
+  # ============================================
+  # Stage 2: Deploy to Development
+  # ============================================
+  - stage: DeployDev
+    displayName: 'Deploy to Development'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    variables:
+      environment: 'dev'
+    jobs:
+      - deployment: DeployContainerApp
+        displayName: 'Deploy Container App'
+        environment: 'development'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Deploy to Container App'
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Check if Container App exists
+                      APP_EXISTS=$(az containerapp show \
+                        --name $(containerAppName) \
+                        --resource-group $(resourceGroupName) \
+                        --query "name" -o tsv 2>/dev/null || echo "")
+                      
+                      if [ -z "$APP_EXISTS" ]; then
+                        echo "Creating new Container App..."
+                        
+                        # Get the managed identity resource ID
+                        IDENTITY_ID=$(az identity show \
+                          --name myprojectdevaca-identity \
+                          --resource-group $(resourceGroupName) \
+                          --query "id" -o tsv)
+                        
+                        az containerapp create \
+                          --name $(containerAppName) \
+                          --resource-group $(resourceGroupName) \
+                          --environment $(containerAppEnvName) \
+                          --image $(acrLoginServer)/$(imageName):$(imageTag) \
+                          --registry-server $(acrLoginServer) \
+                          --registry-identity "$IDENTITY_ID" \
+                          --user-assigned "$IDENTITY_ID" \
+                          --target-port 3000 \
+                          --ingress external \
+                          --cpu 0.5 \
+                          --memory 1.0Gi \
+                          --min-replicas 0 \
+                          --max-replicas 10
+                      else
+                        echo "Updating existing Container App..."
+                        az containerapp update \
+                          --name $(containerAppName) \
+                          --resource-group $(resourceGroupName) \
+                          --image $(acrLoginServer)/$(imageName):$(imageTag)
+                      fi
+                      
+                      # Get the app URL
+                      APP_URL=$(az containerapp show \
+                        --name $(containerAppName) \
+                        --resource-group $(resourceGroupName) \
+                        --query "properties.configuration.ingress.fqdn" -o tsv)
+                      
+                      echo "##vso[task.setvariable variable=appUrl]$APP_URL"
+                      echo "Deployment complete! App URL: https://$APP_URL"
+
+                - task: AzureCLI@2
+                  displayName: 'Verify Deployment'
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "Waiting for container to be ready..."
+                      sleep 30
+                      
+                      # Check container app status
+                      az containerapp revision list \
+                        --name $(containerAppName) \
+                        --resource-group $(resourceGroupName) \
+                        --query "[0].{Name:name, Active:properties.active, Replicas:properties.replicas}" \
+                        -o table
+
+  # ============================================
+  # Stage 3: Deploy to Production
+  # ============================================
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      environment: 'prod'
+      resourceGroupName: 'rg-myproject-prod'
+      containerAppName: 'myprojectprodaca-aca'
+      containerAppEnvName: 'myprojectprodacr-aca-env'
+    jobs:
+      - deployment: DeployContainerAppProd
+        displayName: 'Deploy Container App to Production'
+        environment: 'production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Deploy to Production Container App'
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Update Container App with new image
+                      az containerapp update \
+                        --name $(containerAppName) \
+                        --resource-group $(resourceGroupName) \
+                        --image $(acrLoginServer)/$(imageName):$(imageTag)
+                      
+                      # Get the app URL
+                      APP_URL=$(az containerapp show \
+                        --name $(containerAppName) \
+                        --resource-group $(resourceGroupName) \
+                        --query "properties.configuration.ingress.fqdn" -o tsv)
+                      
+                      echo "Production deployment complete! App URL: https://$APP_URL"

@@ -3,7 +3,7 @@ resource "azurerm_container_registry" "acr" {
     location            = var.location
     resource_group_name = var.resource_group_name
     sku                 = "Premium"
-    admin_enabled       = true
+    admin_enabled       = false  # Using managed identity instead of admin credentials
 
     public_network_access_enabled = false # Sensitive data, disable public network access
 
@@ -43,10 +43,17 @@ resource "azurerm_container_app_environment" "aca-env" {
     internal_load_balancer_enabled = false
 }
 
+# User-assigned managed identity for Container App to pull from ACR
+resource "azurerm_user_assigned_identity" "aca_identity" {
+    name                = "${var.aca_name}-identity"
+    location            = var.location
+    resource_group_name = var.resource_group_name
+}
+
 resource "azurerm_role_assignment" "acr_role_assignment" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_container_app.aca.identity[0].principal_id
+  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
 }
 
 
@@ -59,24 +66,20 @@ resource "azurerm_container_app" "aca" {
     revision_mode = "Single"
 
     identity {
-        type = "SystemAssigned"
+        type         = "UserAssigned"
+        identity_ids = [azurerm_user_assigned_identity.aca_identity.id]
     }
 
-
-    registry {
-        server               = azurerm_container_registry.acr.login_server
-        username             = azurerm_container_registry.acr.admin_username
-        password_secret_name = "acr-password"
-    }
-
-    secret {
-        name  = "acr-password"
-        value = azurerm_container_registry.acr.admin_password
-    }
+    # Registry block only needed when pulling from private ACR
+    # Uncomment when using: myprojectdevacracr.azurecr.io/app-server:latest
+    # registry {
+    #     server   = azurerm_container_registry.acr.login_server
+    #     identity = azurerm_user_assigned_identity.aca_identity.id
+    # }
 
     ingress {
         external_enabled = true
-        target_port       = 3000
+        target_port       = 80
         transport         = "auto"
 
         traffic_weight {
@@ -93,6 +96,8 @@ resource "azurerm_container_app" "aca" {
         memory = "1Gi"
       }
     }
+
+    depends_on = [azurerm_role_assignment.acr_role_assignment]
 }
 
 

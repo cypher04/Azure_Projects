@@ -1,0 +1,289 @@
+# Azure DevOps Pipeline for Infrastructure Deployment (Terraform)
+# This pipeline provisions Azure infrastructure: ACR, VNet, Container App Environment, etc.
+# Targets: container_app_deployment_project folder
+# NOTE: Uses bash script to install Terraform (no marketplace extension required)
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - container_app_deployment_project/Terraform/modules/**
+      - container_app_deployment_project/Terraform/env/**
+    exclude:
+      - container_app_deployment_project/Terraform/pipeline/**
+      - container_app_deployment_project/App/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - container_app_deployment_project/Terraform/modules/**
+      - container_app_deployment_project/Terraform/env/**
+
+variables:
+  azureServiceConnection: 'azure-service-connection'
+  terraformVersion: '1.6.0'
+  backendResourceGroup: 'rg-terraform-state'
+  backendStorageAccount: 'stterraformstate'
+  backendContainerName: 'tfstate'
+  projectFolder: 'container_app_deployment_project'
+  terraformWorkingDirectory: '$(Build.SourcesDirectory)/$(projectFolder)/Terraform'
+
+stages:
+  - stage: Validate
+    displayName: 'Validate Terraform'
+    jobs:
+      - job: Validate
+        displayName: 'Terraform Validate'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+
+          - script: |
+              curl -fsSL https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip -o terraform.zip
+              unzip -o terraform.zip
+              sudo mv terraform /usr/local/bin/
+              terraform version
+            displayName: 'Install Terraform'
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Format Check'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: $(terraformWorkingDirectory)
+              inlineScript: |
+                terraform fmt -check -recursive || echo "##vso[task.logissue type=warning]Run terraform fmt -recursive locally"
+
+          - task: AzureCLI@2
+            displayName: 'Validate Dev'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: $(terraformWorkingDirectory)/env/dev
+              inlineScript: |
+                terraform init -backend=false
+                terraform validate
+
+          - task: AzureCLI@2
+            displayName: 'Validate Prod'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: $(terraformWorkingDirectory)/env/prod
+              inlineScript: |
+                terraform init -backend=false
+                terraform validate
+
+  - stage: PlanDev
+    displayName: 'Plan Dev'
+    dependsOn: Validate
+    variables:
+      backendKey: 'dev.terraform.tfstate'
+    jobs:
+      - job: PlanDev
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+
+          - script: |
+              curl -fsSL https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip -o terraform.zip
+              unzip -o terraform.zip
+              sudo mv terraform /usr/local/bin/
+            displayName: 'Install Terraform'
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Init & Plan'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: $(terraformWorkingDirectory)/env/dev
+              inlineScript: |
+                terraform init \
+                  -backend-config="resource_group_name=$(backendResourceGroup)" \
+                  -backend-config="storage_account_name=$(backendStorageAccount)" \
+                  -backend-config="container_name=$(backendContainerName)" \
+                  -backend-config="key=$(backendKey)"
+                terraform plan -out=tfplan -input=false -var-file=terraform.tfvars
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(terraformWorkingDirectory)/env/dev/tfplan'
+              artifact: 'tfplan-dev'
+
+  - stage: ApplyDev
+    displayName: 'Apply Dev'
+    dependsOn: PlanDev
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    variables:
+      backendKey: 'dev.terraform.tfstate'
+    jobs:
+      - deployment: ApplyDev
+        environment: 'infrastructure-dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - script: |
+                    curl -fsSL https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip -o terraform.zip
+                    unzip -o terraform.zip
+                    sudo mv terraform /usr/local/bin/
+                  displayName: 'Install Terraform'
+
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifactName: 'tfplan-dev'
+                    targetPath: '$(terraformWorkingDirectory)/env/dev'
+
+                - task: AzureCLI@2
+                  displayName: 'Terraform Apply'
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    workingDirectory: $(terraformWorkingDirectory)/env/dev
+                    inlineScript: |
+                      terraform init \
+                        -backend-config="resource_group_name=$(backendResourceGroup)" \
+                        -backend-config="storage_account_name=$(backendStorageAccount)" \
+                        -backend-config="container_name=$(backendContainerName)" \
+                        -backend-config="key=$(backendKey)"
+                      terraform apply -auto-approve -input=false tfplan
+                      echo "=== Outputs ===" && terraform output -json
+
+  - stage: PlanProd
+    displayName: 'Plan Prod'
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      backendKey: 'prod.terraform.tfstate'
+    jobs:
+      - job: PlanProd
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+
+          - script: |
+              curl -fsSL https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip -o terraform.zip
+              unzip -o terraform.zip
+              sudo mv terraform /usr/local/bin/
+            displayName: 'Install Terraform'
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Init & Plan'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: $(terraformWorkingDirectory)/env/prod
+              inlineScript: |
+                terraform init \
+                  -backend-config="resource_group_name=$(backendResourceGroup)" \
+                  -backend-config="storage_account_name=$(backendStorageAccount)" \
+                  -backend-config="container_name=$(backendContainerName)" \
+                  -backend-config="key=$(backendKey)"
+                terraform plan -out=tfplan -input=false -var-file=terraform.tfvars
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(terraformWorkingDirectory)/env/prod/tfplan'
+              artifact: 'tfplan-prod'
+
+  - stage: ApplyProd
+    displayName: 'Apply Prod'
+    dependsOn: PlanProd
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      backendKey: 'prod.terraform.tfstate'
+    jobs:
+      - deployment: ApplyProd
+        environment: 'infrastructure-prod'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - script: |
+                    curl -fsSL https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip -o terraform.zip
+                    unzip -o terraform.zip
+                    sudo mv terraform /usr/local/bin/
+                  displayName: 'Install Terraform'
+
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifactName: 'tfplan-prod'
+                    targetPath: '$(terraformWorkingDirectory)/env/prod'
+
+                - task: AzureCLI@2
+                  displayName: 'Terraform Apply'
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    workingDirectory: $(terraformWorkingDirectory)/env/prod
+                    inlineScript: |
+                      terraform init \
+                        -backend-config="resource_group_name=$(backendResourceGroup)" \
+                        -backend-config="storage_account_name=$(backendStorageAccount)" \
+                        -backend-config="container_name=$(backendContainerName)" \
+                        -backend-config="key=$(backendKey)"
+                      terraform apply -auto-approve -input=false tfplan
+                      echo "=== Outputs ===" && terraform output -json
+
+  - stage: DestroyDev
+    displayName: 'Destroy Dev (Manual)'
+    dependsOn: []
+    condition: eq(variables['destroyEnvironment'], 'dev')
+    variables:
+      backendKey: 'dev.terraform.tfstate'
+    jobs:
+      - deployment: DestroyDev
+        environment: 'infrastructure-destroy'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - script: |
+                    curl -fsSL https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip -o terraform.zip
+                    unzip -o terraform.zip
+                    sudo mv terraform /usr/local/bin/
+                  displayName: 'Install Terraform'
+
+                - task: AzureCLI@2
+                  displayName: 'Terraform Destroy'
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    workingDirectory: $(terraformWorkingDirectory)/env/dev
+                    inlineScript: |
+                      terraform init \
+                        -backend-config="resource_group_name=$(backendResourceGroup)" \
+                        -backend-config="storage_account_name=$(backendStorageAccount)" \
+                        -backend-config="container_name=$(backendContainerName)" \
+                        -backend-config="key=$(backendKey)"
+                      echo "WARNING: Destroying Dev Infrastructure!"
+                      terraform destroy -auto-approve -var-file=terraform.tfvars

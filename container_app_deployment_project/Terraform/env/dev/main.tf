@@ -53,12 +53,12 @@ module "networking" {
 
 resource "azurerm_private_dns_zone" "acr_pdz" {
     name                = "privatelink.azurecr.io"
-    resource_group_name = var.resource_group_name
+    resource_group_name = azurerm_resource_group.rg-main.name
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "pdz_vnet_link" {
     name                  = "${var.project_name}-pdz-vnet-link-${var.environment}"
-    resource_group_name   = var.resource_group_name
+    resource_group_name   = azurerm_resource_group.rg-main.name
     private_dns_zone_name = azurerm_private_dns_zone.acr_pdz.name
     virtual_network_id    = module.networking.vnet_id
     registration_enabled  = false
@@ -68,7 +68,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "pdz_vnet_link" {
 resource "azurerm_private_endpoint" "acr_private_endpoint" {
   name                = "${var.project_name}-pe-acr-${var.environment}"
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = azurerm_resource_group.rg-main.name
   subnet_id           = module.networking.acr_sub_id
 
   private_service_connection {

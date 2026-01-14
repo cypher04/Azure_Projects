@@ -7,5 +7,5 @@ output "aca_name" {
 }
 
 output "app_url" {
-    value = azurerm_container_app.aca.latest_revision_fqdn
+    value = azurerm_container_app.aca.ingress[0].fqdn
 }
